@@ -1,0 +1,36 @@
+// Custom logo size override
+.logo {
+  line-height: 70px !important;
+
+  img {
+    height: 40px !important;
+    width: auto !important;
+    max-height: 40px !important;
+    max-width: 100% !important;
+    object-fit: contain !important;
+    display: block !important;
+  }
+
+  .logo-sm img {
+    height: 32px !important;
+    max-height: 32px !important;
+  }
+
+  .logo-lg img {
+    height: 40px !important;
+    max-height: 40px !important;
+  }
+}
+
+.navbar-brand-box {
+  height: 70px !important;
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  padding: 0 12px !important;
+}
+
+// Auth pages
+.auth-logo img {
+  height: 120px !important;
+}

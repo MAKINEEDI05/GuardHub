@@ -1,0 +1,265 @@
+/* 
+ .guard-image {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  justify-content: center;
+  align-items: center;
+}
+
+.pagination {
+  justify-content: right;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+}
+
+.me-2 {
+  margin-right: 0.5rem !important;
+}
+
+table.dataTable td {
+  text-align: center;
+}
+table.dataTable td:contains("G") {
+  background-color: #d4edda;
+}
+table.dataTable td:contains("WEEK OFF") {
+  background-color: #f8d7da;
+}
+
+.custom-modal .modal-dialog {
+  max-width: 800px;
+  width: 90%;
+}
+
+.custom-modal .modal-content {
+  padding: 20px;
+}
+
+.custom-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.custom-modal .modal-body .row {
+  margin-bottom: 15px;
+}
+
+.custom-modal .modal-body .form-group {
+  margin-bottom: 0;
+}
+
+.custom-modal .modal-body .form-group label {
+  font-weight: bold;
+}
+
+.custom-modal .modal-body .form-group select,
+.custom-modal .modal-body .form-group input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+}
+
+.custom-modal .modal-body h5 {
+  margin-top: 20px;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.md-table th,
+.md-table td {
+  min-width: 60px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  padding: 8px;
+}
+
+.md-table th.image,
+.md-table td.image {
+  width: 80px;
+  max-width: 80px;
+}
+
+.md-table th.actions,
+.md-table td.actions {
+  width: 80px;
+  max-width: 80px;
+}
+
+.guard-image {
+  width: 50px !important;
+  height: 50px !important;
+  object-fit: cover;
+}
+
+@media (max-width: 576px) {
+  .md-table th,
+  .md-table td {
+    font-size: 12px;
+  }
+}
+
+.loading-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+} */
+
+.guard-image {
+  width: 50px;
+  height: 50px;
+  border-radius: 50%;
+  object-fit: cover;
+  justify-content: center;
+  align-items: center;
+}
+
+.pagination {
+  justify-content: right;
+}
+
+.btn-sm {
+  padding: 0.25rem 0.5rem;
+}
+
+.me-2 {
+  margin-right: 0.5rem !important;
+}
+
+table.dataTable td {
+  text-align: center;
+}
+
+table.dataTable td:contains("G") {
+  background-color: #d4edda;
+}
+
+table.dataTable td:contains("WEEK OFF") {
+  background-color: #f8d7da;
+}
+
+.custom-modal .modal-dialog {
+  max-width: 800px;
+  width: 90%;
+}
+
+.custom-modal .modal-content {
+  padding: 20px;
+}
+
+.custom-modal .modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.custom-modal .modal-body .row {
+  margin-bottom: 15px;
+}
+
+.custom-modal .modal-body .form-group {
+  margin-bottom: 0;
+}
+
+.custom-modal .modal-body .form-group label {
+  font-weight: bold;
+}
+
+.custom-modal .modal-body .form-group select,
+.custom-modal .modal-body .form-group input {
+  width: 100%;
+  padding: 8px;
+  border-radius: 4px;
+  border: 1px solid #ced4da;
+}
+
+.custom-modal .modal-body h5 {
+  margin-top: 20px;
+  font-size: 1.25rem;
+  font-weight: bold;
+}
+
+.table-responsive {
+  overflow-x: auto;
+}
+
+.md-table th,
+.md-table td {
+  min-width: 60px;
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: normal;
+  padding: 8px;
+}
+
+.md-table th.image,
+.md-table td.image {
+  width: 80px;
+  max-width: 80px;
+}
+
+.md-table th.actions,
+.md-table td.actions {
+  width: 80px;
+  max-width: 80px;
+}
+
+.guard-image {
+  width: 50px !important;
+  height: 50px !important;
+  object-fit: cover;
+}
+
+@media (max-width: 576px) {
+  .md-table th,
+  .md-table td {
+    font-size: 12px;
+  }
+}
+
+.loading-overlay {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* New styles to ensure filters stay on the same line */
+.filter-container {
+  display: flex;
+  align-items: center;
+  gap: 10px; /* Adjust spacing between elements */
+}
+
+.filter-container .form-select,
+.filter-container .form-control {
+  flex: 0 0 auto; /* Prevent flex items from growing or shrinking */
+  max-width: 200px; /* Consistent max width for select elements */
+}
+
+@media (max-width: 768px) {
+  .filter-container {
+    flex-wrap: wrap; /* Allow wrapping on smaller screens if necessary */
+  }
+
+  .filter-container .form-select,
+  .filter-container .form-control {
+    max-width: 100%; /* Full width on small screens */
+    margin-bottom: 10px; /* Add some space below each item when wrapped */
+  }
+}
