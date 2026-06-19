@@ -59,9 +59,7 @@ const BREADCRUMB_ITEMS = [
   { title: "Profile", link: "#" },
   { title: "Security Profile", link: "#" },
 ];
-const API_URL =
-  process.env.REACT_APP_API_BASE_URL ||
-  "https://security-project-pe9c.onrender.com";
+const API_URL = process.env.REACT_APP_API_BASE_URL || "";
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
 const GUARD_IMAGE = guardImage;
