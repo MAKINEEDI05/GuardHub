@@ -17,7 +17,6 @@ import { toast } from "react-toastify";
 const TEMPLATE_COLUMNS = [
   "empId",
   "empName",
-  "department",
   "designation",
   "mobileNo",
   "monday",
@@ -141,7 +140,6 @@ const BulkUploadRoster = ({ apiUrl, existingEmpIds, onUploaded, disabled }) => {
     const sample = {
       empId: "1001",
       empName: "John Doe",
-      department: "Security",
       designation: "Security Guard",
       mobileNo: "9999999999",
       monday: "General",
