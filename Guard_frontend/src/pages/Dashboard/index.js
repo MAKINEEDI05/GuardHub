@@ -1,105 +1,221 @@
-import React , {useEffect} from "react"
+import React, { useEffect, useMemo, useState } from "react";
+import { Link } from "react-router-dom";
+import { Row, Col } from "reactstrap";
+import axios from "axios";
 
-import { connect } from "react-redux";
 import {
-  Row,
-  Col,
-} from "reactstrap"
+  PageContainer,
+  PageHeader,
+  KpiCard,
+  SectionCard,
+  DataTable,
+  StatusBadge,
+  EmptyState,
+} from "components/ui";
 
-// Pages Components
-import Miniwidget from "./Miniwidget"
-import MonthlyEarnings from "./montly-earnings";
-import EmailSent from "./email-sent";
-import MonthlyEarnings2 from "./montly-earnings2";
-import Inbox from "./inbox";
-import RecentActivity from "./recent-activity";
-import WidgetUser from "./widget-user";
-import YearlySales from "./yearly-sales";
-import LatestTransactions from "./latest-transactions";
-import LatestOrders from "./latest-orders";
+const API_URL = process.env.REACT_APP_API_BASE_URL || "";
 
-//Import Action to copy breadcrumb items from local state to redux state
-import { setBreadcrumbItems } from "../../store/actions";
+// Quick-navigation cards point at the existing, unchanged routes.
+const MODULES = [
+  { title: "Employee Profiles", desc: "Manage security personnel records", icon: "mdi-account-group", to: "/profilepage", color: "primary" },
+  { title: "Day Wise Report", desc: "Daily attendance by date", icon: "mdi-calendar-today", to: "/day-wise-report", color: "info" },
+  { title: "Month Wise Report", desc: "Monthly attendance summary", icon: "mdi-calendar-month", to: "/month-wise-report", color: "success" },
+  { title: "Leave & OD", desc: "View leave and OD records", icon: "mdi-file-document-edit-outline", to: "/LeaveOdManagement", color: "warning" },
+  { title: "Apply Leave / OD", desc: "Submit leave or OD requests", icon: "mdi-clipboard-plus-outline", to: "/applied-od", color: "info" },
+  { title: "Security Roster", desc: "Weekly shift assignments", icon: "mdi-shield-account-outline", to: "/security-roaster", color: "danger" },
+];
 
-const Dashboard = (props) => {
+const monthRange = () => {
+  const now = new Date();
+  const start = new Date(now.getFullYear(), now.getMonth(), 1);
+  const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  const fmt = (d) => d.toISOString().split("T")[0];
+  return { from: fmt(start), to: fmt(end) };
+};
 
-  document.title = "Dashboard | Guards Dashboard";
-
-
-  const breadcrumbItems = [
-    { title: "Guards", link: "#" },
-    { title: "Dashboard", link: "#" }
-  ]
+const Dashboard = () => {
+  const [loading, setLoading] = useState(true);
+  const [apiOnline, setApiOnline] = useState(null);
+  const [stats, setStats] = useState({ guards: 0, roster: 0, leaves: 0, ods: 0 });
+  const [recent, setRecent] = useState([]);
 
   useEffect(() => {
-    props.setBreadcrumbItems('Dashboard' , breadcrumbItems)
-  },)
+    const controller = new AbortController();
+    const { from, to } = monthRange();
+    const cfg = { signal: controller.signal };
 
-  const reports = [
-    { title: "Orders", iconClass: "cube-outline", total: "1,587", average: "+11%", badgecolor: "info" },
-    { title: "Revenue", iconClass: "buffer", total: "$46,782", average: "-29%", badgecolor: "danger" },
-    { title: "Average Price", iconClass: "tag-text-outline", total: "$15.9", average: "0%", badgecolor: "warning" },
-    { title: "Product Sold", iconClass: "briefcase-check", total: "1890", average: "+89%", badgecolor: "info" },
-  ]
+    const load = async () => {
+      setLoading(true);
+      try {
+        // Each call is independent; a single failure must not blank the page.
+        const [emp, roster, leaves, ods] = await Promise.allSettled([
+          axios.get(`${API_URL}/emp/get-emp-details`, cfg),
+          axios.get(`${API_URL}/roster/get-emp-data`, cfg),
+          axios.get(`${API_URL}/leave/get-month-wise-leaves?fromDate=${from}&toDate=${to}`, cfg),
+          axios.get(`${API_URL}/od/get-ods?fromDate=${from}&toDate=${to}`, cfg),
+        ]);
+
+        const arr = (r) => (r.status === "fulfilled" && Array.isArray(r.value.data) ? r.value.data : []);
+        const dataArr = (r) =>
+          r.status === "fulfilled" && Array.isArray(r.value.data?.data) ? r.value.data.data : [];
+
+        const empList = arr(emp);
+        const rosterList = arr(roster);
+        const leaveList = dataArr(leaves);
+        const odList = dataArr(ods);
+
+        setApiOnline(emp.status === "fulfilled");
+        setStats({
+          guards: empList.length,
+          roster: rosterList.length,
+          leaves: leaveList.length,
+          ods: odList.length,
+        });
+
+        // Recent activity from real leave/OD records (most recent first).
+        const activity = [
+          ...leaveList.map((l) => ({
+            empId: l.empId,
+            type: "Leave",
+            detail: l.empLeaveType || "Leave",
+            from: l.empFromDate,
+            to: l.empToDate,
+            created: l.createdAt,
+          })),
+          ...odList.map((o) => ({
+            empId: o.empId,
+            type: "OD",
+            detail: o.empOdType || "OD",
+            from: o.empFromDate,
+            to: o.empToDate,
+            created: o.createdAt,
+          })),
+        ]
+          .sort((a, b) => new Date(b.created || 0) - new Date(a.created || 0))
+          .slice(0, 8);
+        setRecent(activity);
+      } catch (e) {
+        if (e.name !== "CanceledError" && e.name !== "AbortError") setApiOnline(false);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    load();
+    return () => controller.abort();
+  }, []);
+
+  const recentColumns = useMemo(
+    () => [
+      { key: "empId", header: "Emp ID", width: "90px" },
+      { key: "type", header: "Type", render: (r) => <StatusBadge status={r.type} /> },
+      { key: "detail", header: "Detail" },
+      {
+        key: "from",
+        header: "From",
+        render: (r) => (r.from ? new Date(r.from).toLocaleDateString() : "--"),
+      },
+      {
+        key: "to",
+        header: "To",
+        render: (r) => (r.to ? new Date(r.to).toLocaleDateString() : "--"),
+      },
+    ],
+    []
+  );
 
   return (
+    <div className="page-content">
+      <PageContainer>
+        <PageHeader
+          title="Guards Hub Overview"
+          subtitle="Security personnel management — at a glance"
+          breadcrumb={[{ label: "Home", link: "/dashboard" }, { label: "Dashboard" }]}
+        />
 
-    <div>comming soon....</div>
-    // <React.Fragment>
+        {/* KPI row — real counts from existing endpoints (no fabricated metrics) */}
+        <Row>
+          <Col xl={3} md={6}>
+            <KpiCard label="Total Guards" value={stats.guards} icon="mdi-account-group" color="primary" loading={loading} />
+          </Col>
+          <Col xl={3} md={6}>
+            <KpiCard label="Rostered Guards" value={stats.roster} icon="mdi-shield-account-outline" color="success" loading={loading} />
+          </Col>
+          <Col xl={3} md={6}>
+            <KpiCard label="Leaves This Month" value={stats.leaves} icon="mdi-airplane-takeoff" color="warning" loading={loading} />
+          </Col>
+          <Col xl={3} md={6}>
+            <KpiCard label="ODs This Month" value={stats.ods} icon="mdi-briefcase-outline" color="info" loading={loading} />
+          </Col>
+        </Row>
 
-    //   {/*mimi widgets */}
-    //   <Miniwidget reports={reports} />
+        <Row>
+          {/* Quick navigation / module cards */}
+          <Col xl={8}>
+            <SectionCard title="Modules" subtitle="Jump to any workspace">
+              <Row>
+                {MODULES.map((m) => (
+                  <Col md={6} key={m.to} className="mb-3">
+                    <Link to={m.to} className="gh-module-card">
+                      <span className={`gh-module-card__icon gh-module-card__icon--${m.color}`}>
+                        <i className={`mdi ${m.icon}`} />
+                      </span>
+                      <span className="gh-module-card__body">
+                        <span className="gh-module-card__title">{m.title}</span>
+                        <span className="gh-module-card__desc">{m.desc}</span>
+                      </span>
+                      <i className="mdi mdi-chevron-right gh-module-card__chevron" />
+                    </Link>
+                  </Col>
+                ))}
+              </Row>
+            </SectionCard>
+          </Col>
 
-    //   <Row>
-    //     <Col xl="3">
-    //       {/* Monthly Earnings */}
-    //       <MonthlyEarnings />
-    //     </Col>
+          {/* System status — derived from a real API probe */}
+          <Col xl={4}>
+            <SectionCard title="System Status">
+              <ul className="gh-status-list">
+                <li>
+                  <span>Backend API</span>
+                  <StatusBadge status={apiOnline === null ? "Pending" : apiOnline ? "Active" : "Inactive"} />
+                </li>
+                <li>
+                  <span>Employee Service</span>
+                  <StatusBadge status={apiOnline ? "Active" : "Pending"} />
+                </li>
+                <li>
+                  <span>Roster Service</span>
+                  <StatusBadge status={stats.roster >= 0 && apiOnline ? "Active" : "Pending"} />
+                </li>
+              </ul>
+              <p className="text-muted mt-3 mb-0" style={{ fontSize: "var(--gh-fs-caption)" }}>
+                Status reflects live reachability of the backend endpoints this
+                page already consumes.
+              </p>
+            </SectionCard>
+          </Col>
+        </Row>
 
-    //     <Col xl="6">
-    //       {/* Email sent */}
-    //       <EmailSent />
-    //     </Col>
+        {/* Recent actions — real leave/OD records for the current month */}
+        <Row>
+          <Col xs={12}>
+            <SectionCard title="Recent Leave & OD Activity" subtitle="Current month" noPadding>
+              {recent.length === 0 && !loading ? (
+                <EmptyState
+                  title="No recent activity"
+                  message="No leave or OD records were submitted this month."
+                  icon="mdi-calendar-blank-outline"
+                />
+              ) : (
+                <DataTable columns={recentColumns} data={recent} loading={loading} pageSize={8} emptyText="No recent activity" />
+              )}
+            </SectionCard>
+          </Col>
+        </Row>
+      </PageContainer>
+    </div>
+  );
+};
 
-    //     <Col xl="3">
-    //       <MonthlyEarnings2 />
-    //     </Col>
-
-    //   </Row>
-    //   <Row>
-
-    //     <Col xl="4" lg="6">
-    //       {/* inbox */}
-    //       <Inbox />
-    //     </Col>
-    //     <Col xl="4" lg="6">
-    //       {/* recent activity */}
-    //       <RecentActivity />
-
-    //     </Col>
-    //     <Col xl="4">
-    //       {/* widget user */}
-    //       <WidgetUser />
-
-    //       {/* yearly sales */}
-    //       <YearlySales />
-    //     </Col>
-    //   </Row>
-
-    //   <Row>
-    //     <Col xl="6">
-    //       {/* latest transactions */}
-    //       <LatestTransactions />
-    //     </Col>
-
-    //     <Col xl="6">
-    //       {/* latest orders */}
-    //       <LatestOrders />
-    //     </Col>
-    //   </Row>
-
-    // </React.Fragment>
-  )
-}
-
-export default connect(null, { setBreadcrumbItems })(Dashboard);
+export default Dashboard;

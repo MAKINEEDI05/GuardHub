@@ -1,0 +1,322 @@
+/* ============================================================================
+   Guards Hub – Enterprise Design System
+   ----------------------------------------------------------------------------
+   A centralised, token-driven layer that modernises the existing Bootstrap /
+   reactstrap (Skote) UI WITHOUT changing any page markup, API calls or logic.
+   It is imported last in App.js so its variables and gentle component polish
+   cascade over the template. Dark mode is driven by [data-theme="dark"] on
+   <html> (see helpers/theme + components/ui/ThemeToggle).
+   ========================================================================== */
+
+/* ----------------------------- Design Tokens ----------------------------- */
+:root {
+  /* Brand / semantic colors */
+  --gh-primary: #4f46e5;
+  --gh-primary-rgb: 79, 70, 229;
+  --gh-primary-hover: #4338ca;
+  --gh-secondary: #64748b;
+  --gh-success: #16a34a;
+  --gh-warning: #d97706;
+  --gh-danger: #dc2626;
+  --gh-info: #0ea5e9;
+
+  /* Surfaces */
+  --gh-bg: #f1f5f9;
+  --gh-card: #ffffff;
+  --gh-card-elevated: #ffffff;
+  --gh-sidebar: #ffffff;
+  --gh-modal: #ffffff;
+  --gh-border: #e2e8f0;
+  --gh-border-strong: #cbd5e1;
+
+  /* Text */
+  --gh-text: #0f172a;
+  --gh-text-muted: #64748b;
+  --gh-text-subtle: #94a3b8;
+  --gh-text-on-primary: #ffffff;
+
+  /* Typography scale */
+  --gh-font: "Inter", "Segoe UI", system-ui, -apple-system, "Helvetica Neue", Arial, sans-serif;
+  --gh-fs-h1: 1.5rem;
+  --gh-fs-h2: 1.25rem;
+  --gh-fs-h3: 1.0625rem;
+  --gh-fs-body: 0.875rem;
+  --gh-fs-caption: 0.75rem;
+  --gh-fw-medium: 500;
+  --gh-fw-semibold: 600;
+  --gh-fw-bold: 700;
+
+  /* Spacing scale */
+  --gh-space-xs: 4px;
+  --gh-space-sm: 8px;
+  --gh-space-md: 16px;
+  --gh-space-lg: 24px;
+  --gh-space-xl: 40px;
+
+  /* Radius */
+  --gh-radius-sm: 6px;
+  --gh-radius-md: 10px;
+  --gh-radius-lg: 16px;
+  --gh-radius-pill: 999px;
+
+  /* Shadows */
+  --gh-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06), 0 1px 3px rgba(15, 23, 42, 0.05);
+  --gh-shadow-md: 0 4px 12px rgba(15, 23, 42, 0.08);
+  --gh-shadow-lg: 0 12px 32px rgba(15, 23, 42, 0.12);
+
+  /* Animations */
+  --gh-transition: 160ms cubic-bezier(0.4, 0, 0.2, 1);
+  --gh-transition-slow: 280ms cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* ------------------------------- Dark Mode ------------------------------- */
+[data-theme="dark"] {
+  --gh-primary: #818cf8;
+  --gh-primary-rgb: 129, 140, 248;
+  --gh-primary-hover: #6366f1;
+  --gh-secondary: #94a3b8;
+  --gh-success: #22c55e;
+  --gh-warning: #f59e0b;
+  --gh-danger: #f87171;
+  --gh-info: #38bdf8;
+
+  --gh-bg: #0b1120;
+  --gh-card: #111827;
+  --gh-card-elevated: #1e293b;
+  --gh-sidebar: #0f172a;
+  --gh-modal: #111827;
+  --gh-border: #1f2937;
+  --gh-border-strong: #334155;
+
+  --gh-text: #e2e8f0;
+  --gh-text-muted: #94a3b8;
+  --gh-text-subtle: #64748b;
+}
+
+/* ============================================================================
+   Global gentle polish for the existing template (light + dark)
+   Only visual properties are touched; layout/spacing of pages is preserved.
+   ========================================================================== */
+body {
+  font-family: var(--gh-font);
+}
+
+/* Cards */
+.card {
+  border: 1px solid var(--gh-border);
+  border-radius: var(--gh-radius-md);
+  box-shadow: var(--gh-shadow-sm);
+  transition: box-shadow var(--gh-transition), border-color var(--gh-transition);
+}
+
+/* Buttons: smoother radius + transitions (colours left to Bootstrap utilities) */
+.btn {
+  border-radius: var(--gh-radius-sm);
+  transition: background-color var(--gh-transition), box-shadow var(--gh-transition),
+    transform var(--gh-transition);
+}
+.btn:active {
+  transform: translateY(1px);
+}
+.btn-primary {
+  background-color: var(--gh-primary);
+  border-color: var(--gh-primary);
+}
+.btn-primary:hover,
+.btn-primary:focus {
+  background-color: var(--gh-primary-hover);
+  border-color: var(--gh-primary-hover);
+}
+
+/* Form controls */
+.form-control,
+.form-select {
+  border-radius: var(--gh-radius-sm);
+  border-color: var(--gh-border-strong);
+  transition: border-color var(--gh-transition), box-shadow var(--gh-transition);
+}
+.form-control:focus,
+.form-select:focus {
+  border-color: var(--gh-primary);
+  box-shadow: 0 0 0 0.2rem rgba(var(--gh-primary-rgb), 0.18);
+}
+
+/* Tables: cleaner headers + sticky support helper */
+.table > :not(caption) > * > * {
+  border-bottom-color: var(--gh-border);
+}
+.table thead th {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: var(--gh-fs-caption);
+  font-weight: var(--gh-fw-semibold);
+  color: var(--gh-text-muted);
+}
+
+/* Badges */
+.badge {
+  border-radius: var(--gh-radius-pill);
+  font-weight: var(--gh-fw-medium);
+  letter-spacing: 0.01em;
+}
+
+/* ============================================================================
+   Dark-mode surface overrides for the Skote layout & Bootstrap components.
+   Targeted, reversible (only active under [data-theme="dark"]).
+   ========================================================================== */
+[data-theme="dark"] body,
+[data-theme="dark"] #layout-wrapper,
+[data-theme="dark"] .main-content,
+[data-theme="dark"] .page-content {
+  background-color: var(--gh-bg) !important;
+  color: var(--gh-text);
+}
+
+[data-theme="dark"] .card,
+[data-theme="dark"] .modal-content,
+[data-theme="dark"] .dropdown-menu,
+[data-theme="dark"] .offcanvas {
+  background-color: var(--gh-card) !important;
+  color: var(--gh-text);
+  border-color: var(--gh-border);
+}
+
+[data-theme="dark"] .card-title,
+[data-theme="dark"] h1,
+[data-theme="dark"] h2,
+[data-theme="dark"] h3,
+[data-theme="dark"] h4,
+[data-theme="dark"] h5,
+[data-theme="dark"] h6,
+[data-theme="dark"] .text-dark {
+  color: var(--gh-text) !important;
+}
+
+[data-theme="dark"] .text-muted {
+  color: var(--gh-text-muted) !important;
+}
+
+/* Header / topbar + sidebar */
+[data-theme="dark"] #page-topbar,
+[data-theme="dark"] .navbar-header,
+[data-theme="dark"] .vertical-menu,
+[data-theme="dark"] .navbar-brand-box,
+[data-theme="dark"] .footer {
+  background-color: var(--gh-sidebar) !important;
+  border-color: var(--gh-border) !important;
+  color: var(--gh-text);
+}
+[data-theme="dark"] #sidebar-menu ul li a,
+[data-theme="dark"] #sidebar-menu ul li a i {
+  color: var(--gh-text-muted) !important;
+}
+[data-theme="dark"] #sidebar-menu ul li a:hover,
+[data-theme="dark"] #sidebar-menu ul li.mm-active > a {
+  color: var(--gh-primary) !important;
+}
+
+/* Tables / inputs / modals in dark */
+[data-theme="dark"] .table {
+  color: var(--gh-text);
+  --bs-table-bg: transparent;
+}
+[data-theme="dark"] .table > :not(caption) > * > * {
+  background-color: transparent;
+  border-bottom-color: var(--gh-border);
+}
+[data-theme="dark"] .table-hover > tbody > tr:hover > * {
+  background-color: rgba(var(--gh-primary-rgb), 0.08);
+  color: var(--gh-text);
+}
+[data-theme="dark"] .form-control,
+[data-theme="dark"] .form-select,
+[data-theme="dark"] .input-group-text {
+  background-color: var(--gh-card-elevated) !important;
+  border-color: var(--gh-border-strong) !important;
+  color: var(--gh-text) !important;
+}
+[data-theme="dark"] .form-control::placeholder {
+  color: var(--gh-text-subtle);
+}
+[data-theme="dark"] .modal-header,
+[data-theme="dark"] .modal-footer {
+  border-color: var(--gh-border) !important;
+}
+[data-theme="dark"] .btn-light {
+  background-color: var(--gh-card-elevated);
+  border-color: var(--gh-border-strong);
+  color: var(--gh-text);
+}
+[data-theme="dark"] .border,
+[data-theme="dark"] .border-top,
+[data-theme="dark"] .border-bottom {
+  border-color: var(--gh-border) !important;
+}
+
+/* ----------------------- Dashboard landing widgets ----------------------- */
+.gh-module-card {
+  display: flex;
+  align-items: center;
+  gap: var(--gh-space-md);
+  padding: var(--gh-space-md);
+  border: 1px solid var(--gh-border);
+  border-radius: var(--gh-radius-md);
+  background: var(--gh-card);
+  color: var(--gh-text);
+  text-decoration: none;
+  transition: border-color var(--gh-transition), box-shadow var(--gh-transition),
+    transform var(--gh-transition);
+  height: 100%;
+}
+.gh-module-card:hover {
+  border-color: var(--gh-primary);
+  box-shadow: var(--gh-shadow-md);
+  transform: translateY(-2px);
+  color: var(--gh-text);
+}
+.gh-module-card__icon {
+  flex: 0 0 auto;
+  width: 44px;
+  height: 44px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--gh-radius-md);
+  font-size: 1.25rem;
+  color: #fff;
+  background: var(--gh-primary);
+}
+.gh-module-card__icon--primary { background: var(--gh-primary); }
+.gh-module-card__icon--info { background: var(--gh-info); }
+.gh-module-card__icon--success { background: var(--gh-success); }
+.gh-module-card__icon--warning { background: var(--gh-warning); }
+.gh-module-card__icon--danger { background: var(--gh-danger); }
+.gh-module-card__body { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.gh-module-card__title { font-weight: var(--gh-fw-semibold); font-size: var(--gh-fs-body); }
+.gh-module-card__desc { font-size: var(--gh-fs-caption); color: var(--gh-text-muted); }
+.gh-module-card__chevron { color: var(--gh-text-subtle); font-size: 1.25rem; }
+
+.gh-status-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.gh-status-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gh-space-sm) 0;
+  border-bottom: 1px solid var(--gh-border);
+  font-size: var(--gh-fs-body);
+}
+.gh-status-list li:last-child { border-bottom: 0; }
+
+/* Respect reduced-motion preferences */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0.001ms !important;
+    animation-duration: 0.001ms !important;
+  }
+}
