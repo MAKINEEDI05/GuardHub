@@ -303,8 +303,10 @@ const getMonthwiseReport = async (req, res) => {
   try {
     const monthwiseData = await EmpAttendance.aggregate([
       {
+        // empId is stored as String in the attendance collection, so match the
+        // string form (parseInt produced a Number and matched nothing).
         $match: {
-          empId: parseInt(empId),
+          empId: String(empId),
         },
       },
       {
@@ -313,11 +315,36 @@ const getMonthwiseReport = async (req, res) => {
             year: { $year: "$empDate" },
             month: { $month: "$empDate" },
           },
+          // Normalise casing/synonyms: attendance is written as "Present"
+          // (manual path) or "present" (biometric/cron path); absentees are
+          // written as "Absent" or "N/A".
           present: {
-            $sum: { $cond: [{ $eq: ["$empAction", "Present"] }, 1, 0] },
+            $sum: {
+              $cond: [
+                {
+                  $eq: [
+                    { $toLower: { $ifNull: ["$empAction", ""] } },
+                    "present",
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
           absent: {
-            $sum: { $cond: [{ $eq: ["$empAction", "Absent"] }, 1, 0] },
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    { $toLower: { $ifNull: ["$empAction", ""] } },
+                    ["absent", "n/a"],
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
         },
       },

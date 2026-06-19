@@ -24,6 +24,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import Loader from "components/Loader";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Base URL for API endpoints
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -567,7 +568,7 @@ const LeaveManagement = () => {
                       <tr key={`${entry._id}-${entry.type}`}>
                         <td>
                           <img
-                            src={`${BASE_URL}/emp/uploads/${entry.empId}.JPG`}
+                            src={getEmpImageUrl(entry)}
                             alt={`Employee ${entry.empId}`}
                             style={{
                               width: "50px",
@@ -575,14 +576,7 @@ const LeaveManagement = () => {
                               objectFit: "cover",
                               borderRadius: "50%",
                             }}
-                            onError={(e) => {
-                              const currentSrc = e.target.src;
-                              if (currentSrc.endsWith(".JPG")) {
-                                e.target.src = `${BASE_URL}/emp/uploads/${entry.empId}.jpg`;
-                              } else {
-                                e.target.src = `${BASE_URL}/emp/uploads/0000.jpg`;
-                              }
-                            }}
+                            onError={(e) => handleEmpImageError(e)}
                           />
                         </td>
                         <td>{entry.empId}</td>

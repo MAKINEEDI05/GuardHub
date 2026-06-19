@@ -18,6 +18,7 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import Loader from "components/Loader";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Base URL for API endpoints
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -332,7 +333,7 @@ const ApplyODForm = () => {
   });
 
   const getImageSrc = (emp) => {
-    return `${BASE_URL}/emp/uploads/${emp.empId}.JPG`;
+    return getEmpImageUrl(emp);
   };
 
   return (
@@ -429,14 +430,7 @@ const ApplyODForm = () => {
                     height: "100px",
                     objectFit: "cover",
                   }}
-                  onError={(e) => {
-                    const currentSrc = e.target.src;
-                    if (currentSrc.endsWith(".JPG")) {
-                      e.target.src = `${BASE_URL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                    } else {
-                      e.target.src = `${BASE_URL}/emp/uploads/0000.jpg`;
-                    }
-                  }}
+                  onError={(e) => handleEmpImageError(e)}
                 />
                 <p>
                   <strong>Emp ID:</strong> {selectedEmployee.empId} |{" "}

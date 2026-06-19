@@ -32,6 +32,7 @@ import { debounce } from "lodash";
 import Papa from "papaparse";
 import DOMPurify from "dompurify";
 import Loader from "components/Loader";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 import Flatpickr from "react-flatpickr";
 import "react-toastify/dist/ReactToastify.css";
 import "flatpickr/dist/themes/material_blue.css";
@@ -807,7 +808,7 @@ const MonthWiseReport = ({ setBreadcrumbItems }) => {
               <>
                 <div className="text-center mb-3">
                   <img
-                    src={`${API_URL}/emp/uploads/${selectedEmployee.empId}.JPG`}
+                    src={getEmpImageUrl(selectedEmployee)}
                     alt={selectedEmployee.empName || "Employee"}
                     style={{
                       width: "85px",
@@ -818,14 +819,7 @@ const MonthWiseReport = ({ setBreadcrumbItems }) => {
                       backgroundColor: "#fff",
                       padding: "5px",
                     }}
-                    onError={(e) => {
-                      const currentSrc = e.target.src;
-                      if (currentSrc.endsWith(".JPG")) {
-                        e.target.src = `${API_URL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                      } else {
-                        e.target.src = `${API_URL}/emp/uploads/0000.jpg`;
-                      }
-                    }}
+                    onError={(e) => handleEmpImageError(e)}
                   />
                 </div>
                 <Table className="table table-bordered">

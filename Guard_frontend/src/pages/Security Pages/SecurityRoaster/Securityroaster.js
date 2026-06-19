@@ -39,6 +39,7 @@ import "react-toastify/dist/ReactToastify.css";
 import "flatpickr/dist/themes/material_blue.css";
 import "./SecurityRoaster.css";
 import guardImage from "./guard.png";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Constants for shift and day options, API settings, and default image
 const SHIFT_OPTIONS = ["General", "A Shift", "B Shift", "C Shift", "WEEK OFF"];
@@ -272,9 +273,7 @@ const GuardTable = React.memo(({ guards, openShiftChangeModal, isLoading }) => {
             src={guard.image || GUARD_IMAGE}
             alt={`Profile of ${sanitizeInput(guard.name) || "Unknown Guard"}`}
             className="guard-image"
-            onError={(e) => {
-              e.target.src = GUARD_IMAGE;
-            }}
+            onError={(e) => handleEmpImageError(e, GUARD_IMAGE)}
             loading="lazy"
           />
         ),
@@ -437,9 +436,7 @@ const ShiftEditModal = React.memo(
                         height: "100px",
                         borderRadius: "50%",
                       }}
-                      onError={(e) => {
-                        e.target.src = GUARD_IMAGE;
-                      }}
+                      onError={(e) => handleEmpImageError(e, GUARD_IMAGE)}
                       loading="lazy"
                     />
                   </Col>
@@ -887,9 +884,7 @@ const AddShiftModal = React.memo(
                         height: "100px",
                         borderRadius: "50%",
                       }}
-                      onError={(e) => {
-                        e.target.src = GUARD_IMAGE;
-                      }}
+                      onError={(e) => handleEmpImageError(e, GUARD_IMAGE)}
                       loading="lazy"
                     />
                   </Col>
@@ -1440,7 +1435,7 @@ const SecurityRoaster = ({ setBreadcrumbItems }) => {
 
           return {
             id: String(guard.empId || guard._id || "N/A"),
-            image: guard.empImage || GUARD_IMAGE,
+            image: guard.empImage ? getEmpImageUrl(guard) : GUARD_IMAGE,
             name: sanitizeInput(guard.empName) || "Unknown Guard",
             mobileNo: guard.mobileNo || "N/A",
             department: sanitizeInput(guard.department) || "Unknown Department",
@@ -1544,7 +1539,7 @@ const SecurityRoaster = ({ setBreadcrumbItems }) => {
             : null;
         const guardData = {
           id: String(guard.empId || guard._id || empId),
-          image: guard.empImage || GUARD_IMAGE,
+          image: guard.empImage ? getEmpImageUrl(guard) : GUARD_IMAGE,
           name: sanitizeInput(guard.empName) || "Unknown Guard",
           mobileNo: guard.mobileNo || "N/A",
           department: sanitizeInput(guard.department) || "Unknown Department",
@@ -1615,7 +1610,7 @@ const SecurityRoaster = ({ setBreadcrumbItems }) => {
       }
       const employee = {
         id: String(employeeData.empId || empId),
-        image: employeeData.empImage || GUARD_IMAGE,
+        image: employeeData.empImage ? getEmpImageUrl(employeeData) : GUARD_IMAGE,
         name: sanitizeInput(employeeData.empName) || "Unknown Employee",
         mobileNo: String(
           employeeData.empMobileNo || employeeData.mobileNo || "N/A"
