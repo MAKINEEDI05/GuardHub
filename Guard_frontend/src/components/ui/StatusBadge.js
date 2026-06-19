@@ -13,14 +13,19 @@ const mapStatus = (status) => {
     case "present":
     case "active":
     case "approved":
+    case "healthy":
       return "success";
     case "absent":
     case "rejected":
     case "inactive":
+    case "offline":
+    case "down":
       return "danger";
     case "leave":
     case "on leave":
     case "pending":
+    case "warning":
+    case "degraded":
       return "warning";
     case "od":
       return "info";

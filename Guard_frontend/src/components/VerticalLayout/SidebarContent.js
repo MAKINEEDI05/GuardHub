@@ -145,7 +145,6 @@ const SidebarContent = props => {
             <li>
               <Link to="/dashboard" className="waves-effect">
                 <i className="mdi mdi-view-dashboard"></i>
-                <span className="badge rounded-pill bg-primary float-end">2</span>
                 <span>{props.t("Dashboard")}</span>
               </Link>
             </li>
