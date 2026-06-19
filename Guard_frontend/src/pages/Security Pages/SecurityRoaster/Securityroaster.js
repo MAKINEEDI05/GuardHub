@@ -33,6 +33,7 @@ import PropTypes from "prop-types";
 import { debounce } from "lodash";
 import Papa from "papaparse";
 import DOMPurify from "dompurify";
+import BulkUploadRoster from "./BulkUploadRoster";
 import Loader from "components/Loader";
 import Flatpickr from "react-flatpickr";
 import "react-toastify/dist/ReactToastify.css";
@@ -2178,6 +2179,17 @@ const SecurityRoaster = ({ setBreadcrumbItems }) => {
                     >
                       Add New Shift
                     </Button>
+                    <BulkUploadRoster
+                      apiUrl={API_URL}
+                      existingEmpIds={guards.map((g) => g.id)}
+                      disabled={isLoading}
+                      onUploaded={() => {
+                        // Refresh data; current filters/search/pagination state
+                        // is preserved (it is applied on top of `guards`).
+                        invalidateCache("allGuards");
+                        fetchGuards(true);
+                      }}
+                    />
                   </div>
                 </div>
 
