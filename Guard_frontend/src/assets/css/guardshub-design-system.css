@@ -311,6 +311,90 @@ body {
 }
 .gh-status-list li:last-child { border-bottom: 0; }
 
+/* Distribution legend (dashboard) */
+.gh-dist-legend {
+  margin-top: var(--gh-space-sm);
+  border-top: 1px solid var(--gh-border);
+  padding-top: var(--gh-space-sm);
+}
+.gh-dist-legend__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: var(--gh-fs-body);
+}
+.gh-dist-legend__label { color: var(--gh-text); }
+.gh-dist-legend__val { font-weight: var(--gh-fw-semibold); color: var(--gh-text); }
+
+/* Stat list (roster insights) */
+.gh-stat-list { list-style: none; margin: 0; padding: 0; }
+.gh-stat-list li {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--gh-space-sm) 0;
+  border-bottom: 1px solid var(--gh-border);
+  font-size: var(--gh-fs-body);
+  color: var(--gh-text);
+}
+.gh-stat-list li:last-child { border-bottom: 0; }
+.gh-stat-list__left { display: inline-flex; align-items: center; gap: var(--gh-space-sm); }
+.gh-stat-list__icon {
+  width: 30px; height: 30px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--gh-radius-sm);
+  color: #fff; font-size: 1rem;
+  background: var(--gh-primary);
+}
+.gh-stat-list__icon--primary { background: var(--gh-primary); }
+.gh-stat-list__icon--info { background: var(--gh-info); }
+.gh-stat-list__icon--success { background: var(--gh-success); }
+.gh-stat-list__icon--warning { background: var(--gh-warning); }
+.gh-stat-list__icon--danger { background: var(--gh-danger); }
+.gh-stat-list__icon--secondary { background: var(--gh-secondary); }
+.gh-stat-list__value { font-weight: var(--gh-fw-bold); color: var(--gh-text); }
+
+/* ----------------------- Enterprise sidebar polish ----------------------- */
+/* Targets the Skote vertical menu without changing its markup. */
+#sidebar-menu ul li a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 18px;
+  font-size: 0.85rem;
+  font-weight: var(--gh-fw-medium);
+  border-radius: var(--gh-radius-sm);
+  margin: 2px 10px;
+  transition: background-color var(--gh-transition), color var(--gh-transition);
+}
+#sidebar-menu ul li a i {
+  font-size: 1.05rem;
+  min-width: 1.4rem;
+  margin-right: 0;
+  transition: color var(--gh-transition);
+}
+#sidebar-menu ul li a:hover {
+  background-color: rgba(var(--gh-primary-rgb), 0.08);
+  color: var(--gh-primary);
+}
+#sidebar-menu ul li.mm-active > a,
+#sidebar-menu ul li a.active {
+  background-color: rgba(var(--gh-primary-rgb), 0.12);
+  color: var(--gh-primary) !important;
+  font-weight: var(--gh-fw-semibold);
+}
+#sidebar-menu ul li.mm-active > a i,
+#sidebar-menu ul li a.active i { color: var(--gh-primary) !important; }
+#sidebar-menu .menu-title {
+  padding: 14px 22px 6px;
+  font-size: 0.68rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--gh-text-subtle);
+  font-weight: var(--gh-fw-semibold);
+}
+
 /* Respect reduced-motion preferences */
 @media (prefers-reduced-motion: reduce) {
   *,
