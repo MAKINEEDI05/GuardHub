@@ -263,3 +263,148 @@ table.dataTable td:contains("WEEK OFF") {
     margin-bottom: 10px; /* Add some space below each item when wrapped */
   }
 }
+/* ===================== Edit Roster modal (enterprise) ===================== */
+.gh-roster-modal .modal-body {
+  padding: 20px 24px;
+}
+
+/* Section 1 — profile card */
+.gh-roster-profile {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding: 16px 18px;
+  border: 1px solid var(--gh-border, #e2e8f0);
+  border-radius: 12px;
+  background: var(--gh-card-elevated, #f8fafc);
+  margin-bottom: 18px;
+}
+.gh-roster-avatar {
+  width: 88px;
+  height: 88px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid #fff;
+  box-shadow: 0 2px 8px rgba(15, 23, 42, 0.12);
+  flex: 0 0 auto;
+}
+.gh-roster-profile__name {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.2;
+  color: var(--gh-text, #0f172a);
+}
+.gh-roster-profile__role {
+  color: var(--gh-text-muted, #64748b);
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.gh-roster-profile__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 18px;
+  font-size: 0.85rem;
+  color: var(--gh-text-muted, #475569);
+}
+
+/* Sections */
+.gh-roster-section {
+  margin-bottom: 18px;
+}
+.gh-roster-section__title {
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--gh-text-subtle, #94a3b8);
+  margin-bottom: 10px;
+}
+
+/* Roster duration / validation */
+.gh-roster-duration {
+  font-size: 0.9rem;
+  color: var(--gh-text, #0f172a);
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 12px;
+}
+.gh-roster-invalid {
+  font-size: 0.85rem;
+  color: #b91c1c;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 12px;
+  margin-top: 8px;
+}
+
+/* Section 3 — weekly grid */
+.gh-roster-grid {
+  width: 100%;
+  border-collapse: separate;
+  border-spacing: 0 6px;
+}
+.gh-roster-grid__day {
+  font-weight: 600;
+  color: var(--gh-text, #0f172a);
+  width: 110px;
+  white-space: nowrap;
+}
+.gh-shift-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex: 0 0 auto;
+  display: inline-block;
+}
+.gh-shift-select {
+  border-radius: 8px !important;
+}
+
+/* Section 4 — summary */
+.gh-roster-summary {
+  border: 1px solid var(--gh-border, #e2e8f0);
+  border-radius: 12px;
+  padding: 14px 16px;
+  background: var(--gh-card, #fff);
+}
+.gh-roster-summary__row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 0;
+  font-size: 0.9rem;
+}
+.gh-roster-summary__total {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  margin-top: 6px;
+  border-top: 1px solid var(--gh-border, #e2e8f0);
+  font-size: 0.95rem;
+}
+
+/* Section 6 — sticky action bar */
+.gh-roster-actions {
+  position: sticky;
+  bottom: -1px;
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  padding: 14px 0 2px;
+  margin-top: 8px;
+  background: var(--gh-card, #fff);
+  border-top: 1px solid var(--gh-border, #e2e8f0);
+}
+
+@media (max-width: 575px) {
+  .gh-roster-profile {
+    flex-direction: column;
+    text-align: center;
+  }
+  .gh-roster-profile__meta {
+    justify-content: center;
+  }
+}

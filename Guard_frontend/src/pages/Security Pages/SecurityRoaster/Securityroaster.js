@@ -22,6 +22,8 @@ import {
   FormGroup,
   Label,
   InputGroup,
+  Spinner,
+  Badge,
 } from "reactstrap";
 import { connect } from "react-redux";
 import { MDBDataTable } from "mdbreact";
@@ -44,6 +46,51 @@ import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Constants for shift and day options, API settings, and default image
 const SHIFT_OPTIONS = ["General", "A Shift", "B Shift", "C Shift", "WEEK OFF"];
+
+// Consistent shift colour coding across the roster experience.
+// General=Blue, A Shift=Green, B Shift=Orange, C Shift=Purple, Week Off=Gray.
+const SHIFT_COLORS = {
+  General: { bg: "#e0e7ff", fg: "#3730a3", dot: "#4f46e5" },
+  "A Shift": { bg: "#dcfce7", fg: "#166534", dot: "#16a34a" },
+  "B Shift": { bg: "#ffedd5", fg: "#9a3412", dot: "#ea580c" },
+  "C Shift": { bg: "#f3e8ff", fg: "#6b21a8", dot: "#9333ea" },
+  "WEEK OFF": { bg: "#f1f5f9", fg: "#475569", dot: "#94a3b8" },
+};
+const shiftColor = (s) => SHIFT_COLORS[s] || SHIFT_COLORS.General;
+// Weekday order used in the edit modal grid (Mon-first, like a real roster).
+const WEEK_ORDER = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+];
+const DAY_LABEL = {
+  monday: "Monday",
+  tuesday: "Tuesday",
+  wednesday: "Wednesday",
+  thursday: "Thursday",
+  friday: "Friday",
+  saturday: "Saturday",
+  sunday: "Sunday",
+};
+// Strip decimals/noise from a stored mobile number (e.g. 8897772149.0).
+const formatMobile = (v) => {
+  if (v === undefined || v === null || v === "") return "N/A";
+  const n = Number(v);
+  if (Number.isFinite(n)) return String(Math.trunc(n));
+  return String(v).split(".")[0];
+};
+// Inclusive day count between two dates (date-only).
+const daysBetween = (from, to) => {
+  if (!from || !to) return 0;
+  const a = new Date(from.getFullYear(), from.getMonth(), from.getDate());
+  const b = new Date(to.getFullYear(), to.getMonth(), to.getDate());
+  const diff = Math.floor((b - a) / 86400000) + 1;
+  return diff > 0 ? diff : 0;
+};
 const DAY_OPTIONS = [
   "All Days",
   "Sunday",
@@ -406,12 +453,66 @@ const ShiftEditModal = React.memo(
 
     logger.info("ShiftEditModal form model:", formModel);
 
+    // Local shift state drives the live summary, colours and validation while
+    // still submitting through the existing AvForm fields (named per weekday).
+    const [shifts, setShifts] = useState({});
+    const [submitting, setSubmitting] = useState(false);
+
+    useEffect(() => {
+      const ws = (selectedGuard && selectedGuard.weeklyShifts) || {};
+      setShifts({
+        monday: ws.monday || "General",
+        tuesday: ws.tuesday || "General",
+        wednesday: ws.wednesday || "General",
+        thursday: ws.thursday || "General",
+        friday: ws.friday || "General",
+        saturday: ws.saturday || "General",
+        sunday: ws.sunday || "General",
+      });
+    }, [selectedGuard]);
+
     if (!selectedGuard) return null;
 
+    const fromD = shiftFromDate || defaultFromDate;
+    const toD = shiftToDate || defaultToDate;
+    const stripT = (d) => new Date(d.getFullYear(), d.getMonth(), d.getDate());
+    const dateInvalid = !!(fromD && toD) && stripT(toD) < stripT(fromD);
+    const coveredDays = dateInvalid ? 0 : daysBetween(fromD, toD);
+    const allAssigned = WEEK_ORDER.every((d) =>
+      SHIFT_OPTIONS.includes(shifts[d])
+    );
+
+    // Wrap the existing handler to drive the save spinner; it owns the API
+    // call, toast, table refresh and modal close on success.
+    const onSubmit = async (event, values) => {
+      if (dateInvalid || !allAssigned) {
+        toast.error("Please fix the highlighted fields before saving.");
+        return;
+      }
+      setSubmitting(true);
+      try {
+        await handleShiftSubmit(event, values);
+      } catch (err) {
+        logger.error("Roster save failed:", err);
+      } finally {
+        setSubmitting(false);
+      }
+    };
+
     return (
-      <Modal isOpen={isOpen} toggle={toggle} className="custom-modal" centered>
+      <Modal
+        isOpen={isOpen}
+        toggle={toggle}
+        className="custom-modal gh-roster-modal"
+        size="lg"
+        centered
+        scrollable
+      >
         <ModalHeader toggle={toggle}>
-          Edit Roster for {sanitizeInput(selectedGuard.name) || "Unknown Guard"}
+          <span className="me-2">Edit Roster</span>
+          <Badge color="info" pill>
+            Editing
+          </Badge>
         </ModalHeader>
         <ModalBody>
           {isModalLoading ? (
@@ -421,316 +522,268 @@ const ShiftEditModal = React.memo(
             </div>
           ) : (
             <ErrorBoundary>
-              <AvForm onValidSubmit={handleShiftSubmit} model={formModel}>
-                <Row className="mb-3">
-                  <Col xs={12} className="text-center">
-                    <img
-                      src={selectedGuard.image || GUARD_IMAGE}
-                      alt={`Profile of ${
-                        sanitizeInput(selectedGuard.name) || "Unknown Guard"
-                      }`}
-                      className="guard-image"
-                      style={{
-                        width: "100px",
-                        height: "100px",
-                        borderRadius: "50%",
-                      }}
-                      onError={(e) => handleEmpImageError(e, GUARD_IMAGE)}
-                      loading="lazy"
-                    />
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>Employee ID</Label>
-                      <Input
-                        type="text"
-                        value={selectedGuard.id || "N/A"}
-                        disabled
-                        aria-label="Employee ID"
-                      />
-                    </FormGroup>
-                  </Col>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>Employee Name</Label>
-                      <Input
-                        type="text"
-                        value={
-                          sanitizeInput(selectedGuard.name) || "Unknown Guard"
-                        }
-                        disabled
-                        aria-label="Employee Name"
-                      />
-                    </FormGroup>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>Mobile No</Label>
-                      <Input
-                        type="text"
-                        value={selectedGuard.mobileNo || "N/A"}
-                        disabled
-                        aria-label="Mobile Number"
-                      />
-                    </FormGroup>
-                  </Col>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>Department</Label>
-                      <Input
-                        type="text"
-                        value={
-                          sanitizeInput(selectedGuard.department) ||
-                          "Unknown Department"
-                        }
-                        disabled
-                        aria-label="Department"
-                      />
-                    </FormGroup>
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>Designation</Label>
-                      <Input
-                        type="text"
-                        value={
-                          sanitizeInput(selectedGuard.designation) ||
-                          "Unknown Designation"
-                        }
-                        disabled
-                        aria-label="Designation"
-                      />
-                    </FormGroup>
-                  </Col>
-                </Row>
+              <AvForm onValidSubmit={onSubmit}>
+                {/* SECTION 1 — read-only employee profile (from securitydetails) */}
+                <div className="gh-roster-profile">
+                  <img
+                    src={selectedGuard.image || GUARD_IMAGE}
+                    alt={`Profile of ${
+                      sanitizeInput(selectedGuard.name) || "Employee"
+                    }`}
+                    className="gh-roster-avatar"
+                    onError={(e) => handleEmpImageError(e, GUARD_IMAGE)}
+                    loading="lazy"
+                  />
+                  <div className="gh-roster-profile__info">
+                    <div className="gh-roster-profile__name">
+                      {sanitizeInput(selectedGuard.name) || "Unknown Employee"}
+                    </div>
+                    <div className="gh-roster-profile__role">
+                      {sanitizeInput(selectedGuard.designation) || "—"}
+                    </div>
+                    <div className="gh-roster-profile__meta">
+                      <span>
+                        <strong>Employee ID:</strong> {selectedGuard.id || "N/A"}
+                      </span>
+                      <span>
+                        <strong>Department:</strong>{" "}
+                        {sanitizeInput(selectedGuard.department) || "Security"}
+                      </span>
+                      <span>
+                        <strong>Mobile:</strong>{" "}
+                        {formatMobile(selectedGuard.mobileNo)}
+                      </span>
+                    </div>
+                  </div>
+                </div>
 
-                <h5 className="mt-3">Edit Weekly Shifts</h5>
-                <Row>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>From Date</Label>
-                      <InputGroup>
-                        <Flatpickr
-                          className="form-control d-block"
-                          placeholder="Select From Date"
-                          options={{
-                            altInput: true,
-                            altFormat: "F j, Y",
-                            dateFormat: "Y-m-d",
-                            onError: (error) => {
-                              logger.error("Flatpickr from date error:", error);
-                              toast.error("Invalid date selected");
-                            },
-                          }}
-                          value={shiftFromDate || defaultFromDate}
-                          onChange={([date]) => {
-                            try {
-                              if (
-                                date &&
-                                date instanceof Date &&
-                                !isNaN(date.getTime())
-                              ) {
+                {/* SECTION 2 — roster period */}
+                <div className="gh-roster-section">
+                  <h6 className="gh-roster-section__title">Roster Period</h6>
+                  <Row>
+                    <Col md={6}>
+                      <FormGroup>
+                        <Label>From Date</Label>
+                        <InputGroup>
+                          <Flatpickr
+                            className="form-control d-block"
+                            placeholder="Select From Date"
+                            options={{
+                              altInput: true,
+                              altFormat: "F j, Y",
+                              dateFormat: "Y-m-d",
+                            }}
+                            value={fromD}
+                            onChange={([date]) => {
+                              if (date instanceof Date && !isNaN(date.getTime()))
                                 setShiftFromDate(date);
-                              } else {
-                                logger.warn(
-                                  "Invalid date selected for from date"
-                                );
-                                toast.warn("Please select a valid date");
-                              }
-                            } catch (error) {
-                              logger.error("Error setting from date:", error);
-                              toast.error("Error setting date");
-                            }
-                          }}
-                          aria-label="Shift start date"
-                        />
-                        <AvField
-                          name="fromDate"
-                          type="hidden"
-                          value={formatDateForAPI(
-                            shiftFromDate || defaultFromDate
-                          )}
-                          validate={{
-                            required: {
-                              value: true,
-                              errorMessage: "Please select a from date",
-                            },
-                            date: {
-                              value: true,
-                              errorMessage: "Invalid from date",
-                              format: "YYYY-MM-DD",
-                            },
-                          }}
-                        />
-                      </InputGroup>
-                    </FormGroup>
-                  </Col>
-                  <Col md={6}>
-                    <FormGroup>
-                      <Label>To Date</Label>
-                      <InputGroup>
-                        <Flatpickr
-                          className="form-control d-block"
-                          placeholder="Select To Date"
-                          options={{
-                            altInput: true,
-                            altFormat: "F j, Y",
-                            dateFormat: "Y-m-d",
-                            minDate: shiftFromDate || defaultFromDate,
-                            onError: (error) => {
-                              logger.error("Flatpickr to date error:", error);
-                              toast.error("Invalid date selected");
-                            },
-                          }}
-                          value={shiftToDate || defaultToDate}
-                          onChange={([date]) => {
-                            try {
-                              if (
-                                date &&
-                                date instanceof Date &&
-                                !isNaN(date.getTime())
-                              ) {
+                            }}
+                            aria-label="Shift start date"
+                          />
+                          <AvField
+                            name="fromDate"
+                            type="hidden"
+                            value={formatDateForAPI(fromD)}
+                            validate={{
+                              required: {
+                                value: true,
+                                errorMessage: "Please select a from date",
+                              },
+                            }}
+                          />
+                        </InputGroup>
+                      </FormGroup>
+                    </Col>
+                    <Col md={6}>
+                      <FormGroup>
+                        <Label>To Date</Label>
+                        <InputGroup>
+                          <Flatpickr
+                            className="form-control d-block"
+                            placeholder="Select To Date"
+                            options={{
+                              altInput: true,
+                              altFormat: "F j, Y",
+                              dateFormat: "Y-m-d",
+                              minDate: fromD,
+                            }}
+                            value={toD}
+                            onChange={([date]) => {
+                              if (date instanceof Date && !isNaN(date.getTime()))
                                 setShiftToDate(date);
-                              } else {
-                                logger.warn(
-                                  "Invalid date selected for to date"
-                                );
-                                toast.warn("Please select a valid date");
-                              }
-                            } catch (error) {
-                              logger.error("Error setting to date:", error);
-                              toast.error("Error setting date");
-                            }
-                          }}
-                          aria-label="Shift end date"
-                        />
-                        <AvField
-                          name="toDate"
-                          type="hidden"
-                          value={formatDateForAPI(shiftToDate || defaultToDate)}
-                          validate={{
-                            required: {
-                              value: true,
-                              errorMessage: "Please select a to date",
-                            },
-                            date: {
-                              value: true,
-                              errorMessage: "Invalid to date",
-                              format: "YYYY-MM-DD",
-                            },
-                            custom: (value, ctx) => {
-                              if (
-                                value &&
-                                ctx.fromDate &&
-                                new Date(value) < new Date(ctx.fromDate)
-                              ) {
-                                return "Please select a valid to date (after from date)";
-                              }
-                              return true;
-                            },
-                          }}
-                        />
-                      </InputGroup>
-                    </FormGroup>
-                  </Col>
-                </Row>
+                            }}
+                            aria-label="Shift end date"
+                          />
+                          <AvField
+                            name="toDate"
+                            type="hidden"
+                            value={formatDateForAPI(toD)}
+                            validate={{
+                              required: {
+                                value: true,
+                                errorMessage: "Please select a to date",
+                              },
+                            }}
+                          />
+                        </InputGroup>
+                      </FormGroup>
+                    </Col>
+                  </Row>
+                  {dateInvalid ? (
+                    <div className="gh-roster-invalid">
+                      <i className="mdi mdi-alert-circle-outline me-1" />
+                      To Date cannot be before From Date.
+                    </div>
+                  ) : (
+                    <div className="gh-roster-duration">
+                      <i className="mdi mdi-calendar-range me-1" />
+                      {fromD.toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}
+                      {" → "}
+                      {toD.toLocaleDateString("en-GB", {
+                        day: "2-digit",
+                        month: "short",
+                        year: "numeric",
+                      })}{" "}
+                      <strong>
+                        ({coveredDays} {coveredDays === 1 ? "Day" : "Days"})
+                      </strong>
+                    </div>
+                  )}
+                </div>
+
+                {/* SECTION 3 + 4 — weekly shift grid + live summary */}
                 <Row>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="sunday"
-                      label="Sunday"
-                      value={
-                        selectedGuard.weeklyShifts?.sunday || SHIFT_OPTIONS[0]
-                      }
-                    />
+                  <Col lg={7}>
+                    <div className="gh-roster-section">
+                      <h6 className="gh-roster-section__title">
+                        Weekly Shift Assignment
+                      </h6>
+                      <table className="gh-roster-grid">
+                        <tbody>
+                          {WEEK_ORDER.map((day) => {
+                            const c = shiftColor(shifts[day]);
+                            return (
+                              <tr key={day}>
+                                <td className="gh-roster-grid__day">
+                                  {DAY_LABEL[day]}
+                                </td>
+                                <td>
+                                  <div className="d-flex align-items-center gap-2">
+                                    <span
+                                      className="gh-shift-dot"
+                                      style={{ backgroundColor: c.dot }}
+                                    />
+                                    <AvField
+                                      type="select"
+                                      name={day}
+                                      value={shifts[day] || "General"}
+                                      onChange={(e) =>
+                                        setShifts((p) => ({
+                                          ...p,
+                                          [day]: e.target.value,
+                                        }))
+                                      }
+                                      className="form-select gh-shift-select"
+                                      style={{
+                                        backgroundColor: c.bg,
+                                        color: c.fg,
+                                        borderColor: c.dot,
+                                        fontWeight: 600,
+                                      }}
+                                      validate={{
+                                        required: {
+                                          value: true,
+                                          errorMessage: `Assign a shift for ${DAY_LABEL[day]}`,
+                                        },
+                                        pattern: {
+                                          value: `^(${SHIFT_OPTIONS.join("|")})$`,
+                                          errorMessage: "Invalid shift",
+                                        },
+                                      }}
+                                      aria-label={`Shift for ${DAY_LABEL[day]}`}
+                                    >
+                                      {SHIFT_OPTIONS.map((s) => (
+                                        <option key={s} value={s}>
+                                          {s}
+                                        </option>
+                                      ))}
+                                    </AvField>
+                                  </div>
+                                </td>
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </div>
                   </Col>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="monday"
-                      label="Monday"
-                      value={
-                        selectedGuard.weeklyShifts?.monday || SHIFT_OPTIONS[0]
-                      }
-                    />
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="tuesday"
-                      label="Tuesday"
-                      value={
-                        selectedGuard.weeklyShifts?.tuesday || SHIFT_OPTIONS[0]
-                      }
-                    />
-                  </Col>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="wednesday"
-                      label="Wednesday"
-                      value={
-                        selectedGuard.weeklyShifts?.wednesday ||
-                        SHIFT_OPTIONS[0]
-                      }
-                    />
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="thursday"
-                      label="Thursday"
-                      value={
-                        selectedGuard.weeklyShifts?.thursday || SHIFT_OPTIONS[0]
-                      }
-                    />
-                  </Col>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="friday"
-                      label="Friday"
-                      value={
-                        selectedGuard.weeklyShifts?.friday || SHIFT_OPTIONS[0]
-                      }
-                    />
-                  </Col>
-                </Row>
-                <Row>
-                  <Col md={6}>
-                    <ShiftDropdown
-                      name="saturday"
-                      label="Saturday"
-                      value={
-                        selectedGuard.weeklyShifts?.saturday || SHIFT_OPTIONS[0]
-                      }
-                    />
+                  <Col lg={5}>
+                    <div className="gh-roster-section gh-roster-summary">
+                      <h6 className="gh-roster-section__title">Roster Summary</h6>
+                      {SHIFT_OPTIONS.map((s) => {
+                        const count = WEEK_ORDER.filter(
+                          (d) => shifts[d] === s
+                        ).length;
+                        const c = shiftColor(s);
+                        return (
+                          <div className="gh-roster-summary__row" key={s}>
+                            <span className="d-flex align-items-center gap-2">
+                              <span
+                                className="gh-shift-dot"
+                                style={{ backgroundColor: c.dot }}
+                              />
+                              {s === "WEEK OFF" ? "Week Off" : s} Days
+                            </span>
+                            <strong>{count}</strong>
+                          </div>
+                        );
+                      })}
+                      <div className="gh-roster-summary__total">
+                        <span>Total</span>
+                        <strong>{WEEK_ORDER.length} Days</strong>
+                      </div>
+                    </div>
                   </Col>
                 </Row>
 
-                <FormGroup className="mb-0 mt-3">
-                  <Button
-                    type="submit"
-                    color="primary"
-                    className="me-2"
-                    aria-label="Submit changes"
-                  >
-                    Submit
-                  </Button>
+                {!allAssigned && (
+                  <div className="gh-roster-invalid">
+                    <i className="mdi mdi-alert-circle-outline me-1" />
+                    All 7 days must have a shift assigned.
+                  </div>
+                )}
+
+                {/* SECTION 6 — sticky actions */}
+                <div className="gh-roster-actions">
                   <Button
                     type="button"
-                    color="secondary"
+                    color="light"
                     onClick={toggle}
+                    disabled={submitting}
                     aria-label="Cancel"
                   >
                     Cancel
                   </Button>
-                </FormGroup>
+                  <Button
+                    type="submit"
+                    color="primary"
+                    disabled={submitting || dateInvalid || !allAssigned}
+                    aria-label="Save changes"
+                  >
+                    {submitting ? (
+                      <>
+                        <Spinner size="sm" className="me-2" />
+                        Saving…
+                      </>
+                    ) : (
+                      "Save Changes"
+                    )}
+                  </Button>
+                </div>
               </AvForm>
             </ErrorBoundary>
           )}
