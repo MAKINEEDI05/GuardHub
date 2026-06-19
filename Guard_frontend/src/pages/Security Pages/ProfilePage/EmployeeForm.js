@@ -237,6 +237,16 @@ const EmployeeForm = () => {
     setSubmitting(true);
 
     try {
+      if (!formData.empImage && (!imagePreview || imagePreview.endsWith("0000.jpg"))) {
+        toast.error("Employee Image is required", {
+          position: "top-right",
+          autoClose: 5000,
+          toastId: "empImage-required",
+        });
+        setSubmitting(false);
+        return;
+      }
+
       if (!empId && existingEmpIds.includes(parseInt(values.empId))) {
         toast.error("Employee ID already exists", {
           position: "top-right",
@@ -370,7 +380,9 @@ const EmployeeForm = () => {
                 onInvalidSubmit={handleInvalidSubmit}
               >
                 <FormGroup className="mb-4 image-upload-container">
-                  <Label for="employeeImage">Employee Image (Optional)</Label>
+                  <Label for="employeeImage">
+                    Employee Image <span className="text-danger">*</span>
+                  </Label>
                   <div>
                     <input
                       id="employeeImage"
@@ -432,36 +444,41 @@ const EmployeeForm = () => {
                 </FormGroup>
                 <Row>
                   <Col md={6}>
-                    <AvField
-                      className="mb-3"
-                      name="empName"
-                      label="Employee Name"
-                      placeholder="Enter full name"
-                      type="text"
-                      value={formData.empName}
-                      onChange={(e) =>
-                        setFormData({ ...formData, empName: e.target.value })
-                      }
-                      validate={{
-                        required: {
-                          value: true,
-                          errorMessage: "Employee Name is required",
-                        },
-                        minLength: {
-                          value: 2,
-                          errorMessage: "Minimum 2 characters required",
-                        },
-                        maxLength: {
-                          value: 50,
-                          errorMessage: "Maximum 50 characters allowed",
-                        },
-                      }}
-                      disabled={submitting}
-                    />
+                    <AvGroup className="mb-3">
+                      <Label for="empName">
+                        Employee Name <span className="text-danger">*</span>
+                      </Label>
+                      <AvField
+                        name="empName"
+                        placeholder="Enter full name"
+                        type="text"
+                        value={formData.empName}
+                        onChange={(e) =>
+                          setFormData({ ...formData, empName: e.target.value })
+                        }
+                        validate={{
+                          required: {
+                            value: true,
+                            errorMessage: "Employee Name is required",
+                          },
+                          minLength: {
+                            value: 2,
+                            errorMessage: "Minimum 2 characters required",
+                          },
+                          maxLength: {
+                            value: 50,
+                            errorMessage: "Maximum 50 characters allowed",
+                          },
+                        }}
+                        disabled={submitting}
+                      />
+                    </AvGroup>
                   </Col>
                   <Col md={6}>
                     <AvGroup className="mb-3">
-                      <Label for="empId">Employee ID</Label>
+                      <Label for="empId">
+                        Employee ID <span className="text-danger">*</span>
+                      </Label>
                       <AvField
                         name="empId"
                         type="text"
@@ -509,7 +526,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Designation is required",
                         },
                       }}
@@ -538,7 +555,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Department is required",
                         },
                       }}
@@ -570,7 +587,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Mobile Number is required",
                         },
                         pattern: {
@@ -597,7 +614,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Aadhar Number is required",
                         },
                         pattern: {
@@ -651,7 +668,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Bank Account Number is required",
                         },
                         pattern: {
@@ -738,7 +755,7 @@ const EmployeeForm = () => {
                         value={formData.empDob}
                         validate={{
                           required: {
-                            value: true,
+                            value: false,
                             errorMessage: "Date of Birth is required",
                           },
                         }}
@@ -771,7 +788,7 @@ const EmployeeForm = () => {
                         value={formData.empDoj}
                         validate={{
                           required: {
-                            value: true,
+                            value: false,
                             errorMessage: "Date of Joining is required",
                           },
                         }}
@@ -791,7 +808,7 @@ const EmployeeForm = () => {
                   }
                   validate={{
                     required: {
-                      value: true,
+                      value: false,
                       errorMessage: "Address is required",
                     },
                     minLength: {
