@@ -162,10 +162,16 @@ const BulkUploadRoster = ({ apiUrl, existingEmpIds, onUploaded, disabled }) => {
   const classify = (raw, dupSet) => {
     const empId = String(raw.empId == null ? "" : raw.empId).trim();
     const errors = [];
+    // empId is the matching key: in roster -> Updated, otherwise New (insert).
+    const isNew = !rosterSet.has(empId);
+    const hasName =
+      !!(raw.empName && String(raw.empName).trim()) || employeeSet.has(empId);
     if (!empId) errors.push("empId is required");
     if (empId && dupSet.has(empId)) errors.push("duplicate empId in file");
-    if (empId && employeeSet.size && !employeeSet.has(empId))
-      errors.push("employee not found");
+    // A new roster record needs a name (from the CSV, since the employee is not
+    // in securitydetails); updates keep their existing name.
+    if (empId && isNew && !hasName)
+      errors.push("empName is required for a new record");
     WEEKDAYS.forEach((d) => {
       if (normShift(raw[d]) === null) errors.push(`invalid shift "${raw[d]}" (${d})`);
     });
@@ -178,7 +184,7 @@ const BulkUploadRoster = ({ apiUrl, existingEmpIds, onUploaded, disabled }) => {
 
     let status;
     if (errors.length) status = "Invalid";
-    else status = rosterSet.has(empId) ? "Updated" : "New";
+    else status = isNew ? "New" : "Updated";
     return { raw, empId, status, errors };
   };
 
