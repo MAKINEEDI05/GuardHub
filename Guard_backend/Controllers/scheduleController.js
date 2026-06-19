@@ -97,7 +97,7 @@ const AddingShiftsAndTimingsForGenerals = async (shiftType, attendanceData) => {
           (a, b) => new Date(a.LogDateTime) - new Date(b.LogDateTime)
         );
         empInTime = moment(attendanceRecords[0].LogDateTime).format("HH:mm:ss");
-        empAction = "present";
+        empAction = "Present";
       } else {
         // Check if employee is on leave
         const isOnLeave =
@@ -109,7 +109,7 @@ const AddingShiftsAndTimingsForGenerals = async (shiftType, attendanceData) => {
             "[]"
           );
 
-        empAction = isOnLeave ? "On Leave" : "N/A";
+        empAction = isOnLeave ? "Leave" : "Absent";
       }
 
       return {
@@ -405,7 +405,7 @@ const InShiftAdding = async (
         (a, b) => new Date(a.LogDateTime) - new Date(b.LogDateTime)
       );
       empInTime = moment(attendanceRecords[0].LogDateTime).format("HH:mm:ss");
-      empAction = "present";
+      empAction = "Present";
     } else {
       // Check if employee is on leave
       const isOnLeave =
@@ -417,7 +417,7 @@ const InShiftAdding = async (
           "[]"
         );
 
-      empAction = isOnLeave ? "On Leave" : "N/A";
+      empAction = isOnLeave ? "Leave" : "Absent";
     }
 
     return {

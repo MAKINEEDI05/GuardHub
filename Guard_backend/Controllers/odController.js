@@ -44,15 +44,15 @@ const addOd = async (req, res) => {
 const getOdByEmpId = async (req, res) => {
   try {
     const { empId } = req.params;
-    const od = await od.find({ empId: empId });
+    const odRecords = await od.find({ empId: empId });
 
-    if (!od || od.length === 0) {
+    if (!odRecords || odRecords.length === 0) {
       return res
         .status(404)
         .json({ message: "od not found for this employee" });
     }
 
-    res.json(od);
+    res.json(odRecords);
   } catch (error) {
     console.error("Error fetching od:", error);
     res.status(500).json({ message: "Error fetching od", error });
@@ -157,7 +157,7 @@ const getMonthwiseOds = async (req, res) => {
       },
     });
 
-    res.status(200).json({ message: "Leaves between dates", data: ods });
+    res.status(200).json({ message: "ODs between dates", data: ods });
   } catch (error) {
     console.error("Error fetching ods:", error);
     res.status(500).json({ message: "Failed to get ods", error });

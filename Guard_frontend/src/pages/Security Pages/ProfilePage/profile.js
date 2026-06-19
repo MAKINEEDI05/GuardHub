@@ -18,6 +18,7 @@ import axios from "axios";
 import { parse, format, isValid } from "date-fns";
 import Loader from "components/Loader"; // Adjust the import path if necessary
 import img from "./0000.jpg";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Utility function to parse and format dates
 const parseAndFormatDate = (dateStr, outputFormat = "dd-MM-yyyy") => {
@@ -159,7 +160,7 @@ const Profile = (props) => {
         image: (
           <div className="text-center">
             <img
-              src={`${baseURL}/emp/uploads/${emp.empId}.JPG`}
+              src={getEmpImageUrl(emp)}
               alt={emp.empName || "Employee"}
               style={{
                 width: "85px",
@@ -170,30 +171,7 @@ const Profile = (props) => {
                 backgroundColor: "#fff",
                 padding: "1px",
               }}
-              onError={(e) => {
-                const currentSrc = e.target.src;
-                if (currentSrc.endsWith(".JPG")) {
-                  e.target.src = `${baseURL}/emp/uploads/${emp.empId}.jpg`;
-                } else if (currentSrc.endsWith(".jpg")) {
-                  // Try .png next if .jpg also fails
-                  e.target.src = `${baseURL}/emp/uploads/${emp.empId}.png`;
-                } else {
-                  e.target.src = img; // fallback default
-                }
-              }}
-              // onError={(e) => {
-              //   const exts = ["JPG", "jpg", "jpeg", "png", "webp"];
-              //   const currentSrc = e.target.src;
-              //   const currentExt = currentSrc.split(".").pop().toLowerCase();
-              //   const currentIndex = exts.indexOf(currentExt);
-              //   const nextExt = exts[currentIndex + 1];
-
-              //   if (nextExt) {
-              //     e.target.src = `${baseURL}/emp/uploads/${emp.empId}.${nextExt}`;
-              //   } else {
-              //     e.target.src = `${baseURL}/emp/uploads/0000.jpg`; // fallback default
-              //   }
-              // }}
+              onError={(e) => handleEmpImageError(e, img)}
             />
           </div>
         ),
@@ -989,7 +967,7 @@ const Profile = (props) => {
             <div className="employee-details-card">
               <div className="text-center mb-4">
                 <img
-                  src={`${baseURL}/emp/uploads/${selectedEmployee.empId}.JPG`}
+                  src={getEmpImageUrl(selectedEmployee)}
                   alt={selectedEmployee.empName}
                   style={{
                     width: "120px",
@@ -999,17 +977,7 @@ const Profile = (props) => {
                     border: "2px solid skyblue",
                     marginBottom: "10px",
                   }}
-                  onError={(e) => {
-                    const currentSrc = e.target.src;
-                    if (currentSrc.endsWith(".JPG")) {
-                      e.target.src = `${baseURL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                    } else if (currentSrc.endsWith(".jpg")) {
-                      // Try .png next if .jpg also fails
-                      e.target.src = `${baseURL}/emp/uploads/${selectedEmployee.empId}.png`;
-                    } else {
-                      e.target.src = img; // fallback default
-                    }
-                  }}
+                  onError={(e) => handleEmpImageError(e, img)}
                 />
                 <h4 className="mb-1">{selectedEmployee.empName}</h4>
                 <p className="text-muted">{selectedEmployee.empDesignation}</p>

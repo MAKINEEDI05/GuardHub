@@ -12,7 +12,7 @@ const {
 router.post("/add-emp-shift", addEmployeShift);
 router.put("/update-emp-roster/:empId", updateRoster);
 router.get("/get-emp-data", getAllgurds);
-router.get("get-guard-shift/:empId", getGurdByEmpId);
+router.get("/get-guard-shift/:empId", getGurdByEmpId);
 router.delete("/guard-delete-byid/:empId", deleteGurd);
 
 module.exports = router;
