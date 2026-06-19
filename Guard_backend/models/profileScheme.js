@@ -14,15 +14,15 @@ const EmpDetails = new mongoose.Schema(
 
     empDesignation: {
       type: String,
-      required: true,
+      required: false,
     },
     empDepartment: {
       type: String,
-      required: true,
+      required: false,
     },
     bankAccountNo: {
       type: Number,
-      required: true,
+      required: false,
     },
     epfNo: {
       type: String,
@@ -34,7 +34,7 @@ const EmpDetails = new mongoose.Schema(
     },
     address: {
       type: String,
-      required: true,
+      required: false,
     },
 
     empMobileNo: {
@@ -43,7 +43,7 @@ const EmpDetails = new mongoose.Schema(
     },
     empAadharNo: {
       type: Number,
-      required: true,
+      required: false,
     },
     empPanNo: {
       type: String,
@@ -59,7 +59,7 @@ const EmpDetails = new mongoose.Schema(
     },
     empImage: {
       type: String,
-      required: false,
+      required: true,
     },
   },
   { versionKey: false, timestamps: true } // ignore __v id
