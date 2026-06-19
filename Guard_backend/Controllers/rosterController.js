@@ -198,11 +198,21 @@ const bulkUpsertRoster = async (req, res) => {
       const empIdStr = String(row.empId == null ? "" : row.empId).trim();
       const errors = [];
 
+      // empId is the sole matching key: exists in roster -> update, else insert.
+      // Employee need NOT pre-exist in securitydetails (master data is used only
+      // to enrich missing fields when available).
+      const emp = empMap.get(empIdStr);
+      const isNew = !existingRosterIds.has(empIdStr);
+      const resolvedName =
+        (row.empName && String(row.empName).trim()) || (emp && emp.empName) || "";
+
       if (!empIdStr) errors.push("empId is required");
-      if (empIdStr && !empMap.has(empIdStr))
-        errors.push("employee not found in securitydetails");
       if (empIdStr && idOccurrences.get(empIdStr) > 1)
         errors.push("duplicate empId in file");
+      // A brand-new roster record must have a name (roster requires empName);
+      // updates keep their existing name when the CSV omits it.
+      if (empIdStr && isNew && !resolvedName)
+        errors.push("empName is required for a new roster record");
 
       // Shift validation/normalization per weekday.
       const shiftFields = {};
@@ -225,25 +235,27 @@ const bulkUpsertRoster = async (req, res) => {
         return;
       }
 
-      const emp = empMap.get(empIdStr);
-      const setFields = {
-        empId: empIdStr,
-        empName: (row.empName && String(row.empName).trim()) || emp.empName,
-        // Department is no longer part of the CSV (all personnel are Security);
-        // derive from master data, defaulting to "Security".
-        department:
-          (row.department && String(row.department).trim()) ||
-          emp.empDepartment ||
-          "Security",
-        designation:
-          (row.designation && String(row.designation).trim()) ||
-          emp.empDesignation ||
-          "",
-        mobileNo:
-          (row.mobileNo && String(row.mobileNo).trim()) ||
-          (emp.empMobileNo != null ? String(emp.empMobileNo) : ""),
-        ...shiftFields,
-      };
+      // Only $set fields we can actually resolve, so an update never wipes an
+      // existing value when the CSV omits it. Department defaults to "Security".
+      const setFields = { empId: empIdStr, ...shiftFields };
+      if (resolvedName) setFields.empName = resolvedName;
+
+      const designation =
+        (row.designation && String(row.designation).trim()) ||
+        (emp && emp.empDesignation) ||
+        "";
+      if (designation) setFields.designation = designation;
+
+      const mobileNo =
+        (row.mobileNo && String(row.mobileNo).trim()) ||
+        (emp && emp.empMobileNo != null ? String(emp.empMobileNo) : "");
+      if (mobileNo) setFields.mobileNo = mobileNo;
+
+      setFields.department =
+        (row.department && String(row.department).trim()) ||
+        (emp && emp.empDepartment) ||
+        "Security";
+
       if (from.date) setFields.shiftFromDate = from.date;
       if (to.date) setFields.shiftToDate = to.date;
 
