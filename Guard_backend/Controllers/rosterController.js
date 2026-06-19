@@ -229,8 +229,12 @@ const bulkUpsertRoster = async (req, res) => {
       const setFields = {
         empId: empIdStr,
         empName: (row.empName && String(row.empName).trim()) || emp.empName,
+        // Department is no longer part of the CSV (all personnel are Security);
+        // derive from master data, defaulting to "Security".
         department:
-          (row.department && String(row.department).trim()) || emp.empDepartment || "",
+          (row.department && String(row.department).trim()) ||
+          emp.empDepartment ||
+          "Security",
         designation:
           (row.designation && String(row.designation).trim()) ||
           emp.empDesignation ||
