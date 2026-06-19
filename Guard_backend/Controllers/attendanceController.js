@@ -55,7 +55,8 @@ const leave_mgmt = require("../models/leaveScheme");
 const todayAttendanceData = async (req, res) => {
   try {
     const empData = await axios.get(
-      "http://210.212.210.89:9001/api/get-attendance-main-log"
+      process.env.ATTENDANCE_LOG_API ||
+        "http://210.212.210.89:9001/api/get-attendance-main-log"
     );
     const data = empData.data;
     const todayDate = new Date().toISOString().split("T")[0];

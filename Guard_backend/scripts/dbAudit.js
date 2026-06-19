@@ -108,22 +108,25 @@ async function auditBiometricDb() {
     console.log("  MONGO_URI1 not set — biometric source unconfigured.");
     return;
   }
+  const dbName = process.env.BIOMETRIC_DB_NAME || "technicalhub";
+  const collName = process.env.BIOMETRIC_COLLECTION || "attendancelogs";
+  const serial = process.env.BIOMETRIC_DEVICE_SERIAL || "0426141300425";
   const client = new MongoClient(uri, { serverSelectionTimeoutMS: 8000 });
   try {
     await client.connect();
-    const db = client.db("technicalhub");
-    console.log("  connected to technicalhub");
+    const db = client.db(dbName);
+    console.log("  connected to", dbName);
     const names = (await db.listCollections().toArray()).map((c) => c.name);
     console.log("  collections:", names.join(", ") || "(none)");
-    if (names.includes("attendancelogs")) {
-      const coll = db.collection("attendancelogs");
-      console.log("  attendancelogs count:", await coll.countDocuments());
+    if (names.includes(collName)) {
+      const coll = db.collection(collName);
+      console.log(`  ${collName} count:`, await coll.countDocuments());
       const sample = await coll.findOne();
-      console.log("  attendancelogs sample:", JSON.stringify(sample, null, 2));
+      console.log(`  ${collName} sample:`, JSON.stringify(sample, null, 2));
       const serialCount = await coll.countDocuments({
-        "after.Serialnumber": "0426141300425",
+        "after.Serialnumber": serial,
       });
-      console.log("  docs matching device serial 0426141300425:", serialCount);
+      console.log(`  docs matching device serial ${serial}:`, serialCount);
     }
   } catch (e) {
     console.log("  EXTERNAL DB UNREACHABLE:", e.message);
