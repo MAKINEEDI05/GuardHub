@@ -99,7 +99,9 @@ import Kanban from "pages/Kanban";
 import Profile from "../pages/Security Pages/ProfilePage/profile";
 import MonthWiseReport from "../pages/Security Pages/MonthWiseReportPage/monthwisereport";
 import DayWiseReport from "../pages/Security Pages/DayWiseReportPage/daywisereport";
-import AppliedOD from "../pages/Security Pages/AppliedOD/appliedod";
+import ApplyLeavePage from "../pages/Security Pages/AppliedOD/ApplyLeavePage";
+import ApplyODPage from "../pages/Security Pages/AppliedOD/ApplyODPage";
+import ApplyOT from "../pages/Security Pages/AppliedOD/ApplyOT";
 import DayMonthReport from "../pages/Security Pages/DayMonthReportPage/Daymonthreport";
 import SecurityRoaster from "pages/Security Pages/SecurityRoaster/Securityroaster";
 import EditRoaster from "pages/Security Pages/EditRoaster/Editroaster";
@@ -197,7 +199,9 @@ const userRoutes = [
   { path: "/profilepage", component: <Profile /> },
   { path: "/day-wise-report", component: <DayWiseReport /> },
   { path: "/month-wise-report", component: <MonthWiseReport /> },
-  { path: "/applied-od", component: <AppliedOD /> },
+  { path: "/apply-leave", component: <ApplyLeavePage /> },
+  { path: "/apply-od", component: <ApplyODPage /> },
+  { path: "/apply-ot", component: <ApplyOT /> },
   { path: "/LeaveOdManagement", component: <LeaveManagement /> },
   { path: "/day-month-report", component: <DayMonthReport /> },
   { path: "/coustom-month-report", component: <CoustomMonthReport /> },
