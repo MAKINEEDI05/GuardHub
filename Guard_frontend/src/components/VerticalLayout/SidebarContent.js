@@ -145,7 +145,6 @@ const SidebarContent = props => {
             <li>
               <Link to="/dashboard" className="waves-effect">
                 <i className="mdi mdi-view-dashboard"></i>
-                <span className="badge rounded-pill bg-primary float-end">2</span>
                 <span>{props.t("Dashboard")}</span>
               </Link>
             </li>
@@ -178,9 +177,21 @@ const SidebarContent = props => {
               </Link>
             </li>
             <li>
-              <Link to="/applied-od" className=" waves-effect">
+              <Link to="/apply-leave" className=" waves-effect">
                 <i className="mdi mdi-calendar-plus"></i>
-                <span>{props.t("Apply Leave/OD")}</span>
+                <span>{props.t("Apply Leave")}</span>
+              </Link>
+            </li>
+            <li>
+              <Link to="/apply-od" className=" waves-effect">
+                <i className="mdi mdi-briefcase-plus-outline"></i>
+                <span>{props.t("Apply OD")}</span>
+              </Link>
+            </li>
+            <li>
+              <Link to="/apply-ot" className=" waves-effect">
+                <i className="mdi mdi-clock-plus-outline"></i>
+                <span>{props.t("Apply OT")}</span>
               </Link>
             </li>
             <li>

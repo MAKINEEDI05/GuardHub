@@ -102,7 +102,7 @@ const AddingShiftsAndTimingsForGenerals = async (shiftType, attendanceData) => {
           (a, b) => new Date(a.LogDateTime) - new Date(b.LogDateTime)
         );
         empInTime = moment(attendanceRecords[0].LogDateTime).format("HH:mm:ss");
-        empAction = "present";
+        empAction = "Present";
       } else {
         // Check if employee is on leave
         const isOnLeave =
@@ -114,7 +114,7 @@ const AddingShiftsAndTimingsForGenerals = async (shiftType, attendanceData) => {
             "[]"
           );
 
-        empAction = isOnLeave ? "On Leave" : "N/A";
+        empAction = isOnLeave ? "Leave" : "Absent";
       }
 
       return {
@@ -410,7 +410,7 @@ const InShiftAdding = async (
         (a, b) => new Date(a.LogDateTime) - new Date(b.LogDateTime)
       );
       empInTime = moment(attendanceRecords[0].LogDateTime).format("HH:mm:ss");
-      empAction = "present";
+      empAction = "Present";
     } else {
       // Check if employee is on leave
       const isOnLeave =
@@ -422,7 +422,7 @@ const InShiftAdding = async (
           "[]"
         );
 
-      empAction = isOnLeave ? "On Leave" : "N/A";
+      empAction = isOnLeave ? "Leave" : "Absent";
     }
 
     return {
@@ -469,8 +469,10 @@ const AddingShiftsAndTimingsForShifts = async (
 const attendanceAdding = async (fromTime, toTime) => {
   await client.connect();
   console.log("Connected to the database");
-  const database = client.db("technicalhub");
-  const collection = database.collection("attendancelogs");
+  const database = client.db(process.env.BIOMETRIC_DB_NAME || "technicalhub");
+  const collection = database.collection(
+    process.env.BIOMETRIC_COLLECTION || "attendancelogs"
+  );
   // console.log("Collection accessed:", database);
 
   // today date
@@ -632,7 +634,10 @@ const attendanceAdding = async (fromTime, toTime) => {
 
     const mydata = await collection.aggregate([
       {
-        $match: { "after.Serialnumber": "0426141300425" },
+        $match: {
+          "after.Serialnumber":
+            process.env.BIOMETRIC_DEVICE_SERIAL || "0426141300425",
+        },
       },
       {
         $addFields: {

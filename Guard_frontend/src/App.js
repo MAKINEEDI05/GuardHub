@@ -18,10 +18,20 @@ import NonAuthLayout from "./components/NonAuthLayout"
 // Import scss
 import "./assets/scss/theme.scss"
 
+// Guards Hub design system (token layer + dark mode) — imported last so it
+// cascades over the template. Plus component-library styles + theme bootstrap.
+import "./assets/css/guardshub-design-system.css"
+import "./components/ui/ui.css"
+import ThemeToggle from "./components/ui/ThemeToggle"
+import { getStoredTheme, applyTheme } from "./helpers/theme"
+
 // Import Firebase Configuration file
 // import { initFirebaseBackend } from "./helpers/firebase_helper"
 
 import fakeBackend from "./helpers/AuthType/fakeBackend"
+
+// Apply the persisted theme as early as possible (avoids a flash).
+applyTheme(getStoredTheme())
 
 // Activating fake backend
 fakeBackend()
@@ -63,6 +73,7 @@ const App = props => {
   const Layout = getLayout()
   return (
     <React.Fragment>
+      <ThemeToggle />
       <Routes>
       {/* Non-authenticated routes */}
       {authRoutes.map((route, idx) => (

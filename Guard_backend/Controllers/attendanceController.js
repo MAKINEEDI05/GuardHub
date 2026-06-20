@@ -2,6 +2,25 @@ const EmpAttendance = require("../models/attendanceScheme");
 const axios = require("axios");
 const roster_mgmt = require("../models/rosterScheme");
 const leave_mgmt = require("../models/leaveScheme");
+const SecAttendanceLogs = require("../models/secMainAttendaceScheme");
+const employe = require("../models/profileScheme");
+
+const WEEKDAYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
+// Format a Date's wall-clock (UTC components) as HH:mm:ss.
+const fmtTime = (d) => {
+  const x = new Date(d);
+  const p = (n) => String(n).padStart(2, "0");
+  return `${p(x.getUTCHours())}:${p(x.getUTCMinutes())}:${p(x.getUTCSeconds())}`;
+};
 
 // const todayAttendanceData = async (req, res) => {
 //   try {
@@ -55,7 +74,8 @@ const leave_mgmt = require("../models/leaveScheme");
 const todayAttendanceData = async (req, res) => {
   try {
     const empData = await axios.get(
-      "http://210.212.210.89:9001/api/get-attendance-main-log"
+      process.env.ATTENDANCE_LOG_API ||
+        "http://210.212.210.89:9001/api/get-attendance-main-log"
     );
     const data = empData.data;
     const todayDate = new Date().toISOString().split("T")[0];
@@ -215,7 +235,10 @@ const getAttendanceByEmpId = async (req, res) => {
       .json({ message: "Error fetching attendance by empId", error });
   }
 };
-// Get attendance by date
+// Get attendance by date — sourced from the REAL biometric collection
+// (secattendancelogs), since empattendances is empty.
+// For the selected date: group logs by EmployeeCode, take first/last punch,
+// join securitydetails (EmployeeCode == empId) + roster for the day's shift.
 const getAttendanceByDate = async (req, res) => {
   try {
     const { empDate } = req.params; // expecting format: yyyy-mm-dd
@@ -224,30 +247,73 @@ const getAttendanceByDate = async (req, res) => {
       return res.status(400).json({ message: "Date is required in query" });
     }
 
-    // Create start and end of day
-    const startOfDay = new Date(empDate);
-    startOfDay.setHours(0, 0, 0, 0);
+    // UTC day boundaries so matching/formatting stay timezone-consistent.
+    const startOfDay = new Date(`${empDate}T00:00:00.000Z`);
+    if (Number.isNaN(startOfDay.getTime())) {
+      return res
+        .status(400)
+        .json({ message: "Invalid date format (expected yyyy-mm-dd)" });
+    }
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
-    const endOfDay = new Date(empDate);
-    endOfDay.setHours(24, 0, 0, 0);
-
-    // Fetch records from MongoDB
-    const records = await EmpAttendance.find({
-      empDate: {
-        $gte: startOfDay,
-        $lt: endOfDay,
+    // Group biometric logs by employee -> first punch (min), last punch (max).
+    const grouped = await SecAttendanceLogs.aggregate([
+      { $match: { LogDateTime: { $gte: startOfDay, $lt: endOfDay } } },
+      {
+        $group: {
+          _id: "$EmployeeCode",
+          firstPunch: { $min: "$LogDateTime" },
+          lastPunch: { $max: "$LogDateTime" },
+          punches: { $sum: 1 },
+        },
       },
+      { $sort: { _id: 1 } },
+    ]);
+
+    if (!grouped.length) {
+      return res
+        .status(200)
+        .json({ message: `Attendance records for ${empDate}`, data: [] });
+    }
+
+    // Join employee + roster details (EmployeeCode is String, empId may be
+    // Number, so key both maps by String).
+    const [employees, rosters] = await Promise.all([
+      employe.find(),
+      roster_mgmt.find(),
+    ]);
+    const empMap = new Map(employees.map((e) => [String(e.empId), e]));
+    const rosterMap = new Map(rosters.map((r) => [String(r.empId), r]));
+    const weekday = WEEKDAYS[startOfDay.getUTCDay()];
+
+    const data = grouped.map((g) => {
+      const code = String(g._id);
+      const emp = empMap.get(code);
+      const roster = rosterMap.get(code);
+      return {
+        empId: code,
+        empName: emp ? emp.empName : "Unknown",
+        empDesignation: emp ? emp.empDesignation : "",
+        empDepartment: emp ? emp.empDepartment : "",
+        empInTime: fmtTime(g.firstPunch),
+        empOutTime: fmtTime(g.lastPunch),
+        empShift: roster && roster.weeklyShifts ? roster.weeklyShifts[weekday] || "" : "",
+        empWeekOff: "",
+        empAction: "Present",
+        empDate,
+        punches: g.punches,
+      };
     });
 
     res.status(200).json({
       message: `Attendance records for ${empDate}`,
-      data: records,
+      data,
     });
   } catch (error) {
     console.error("Error fetching attendance by date:", error);
     res.status(500).json({
       message: "Internal Server Error",
-      error,
+      error: error.message,
     });
   }
 };
@@ -303,8 +369,10 @@ const getMonthwiseReport = async (req, res) => {
   try {
     const monthwiseData = await EmpAttendance.aggregate([
       {
+        // empId is stored as String in the attendance collection, so match the
+        // string form (parseInt produced a Number and matched nothing).
         $match: {
-          empId: parseInt(empId),
+          empId: String(empId),
         },
       },
       {
@@ -313,11 +381,36 @@ const getMonthwiseReport = async (req, res) => {
             year: { $year: "$empDate" },
             month: { $month: "$empDate" },
           },
+          // Normalise casing/synonyms: attendance is written as "Present"
+          // (manual path) or "present" (biometric/cron path); absentees are
+          // written as "Absent" or "N/A".
           present: {
-            $sum: { $cond: [{ $eq: ["$empAction", "Present"] }, 1, 0] },
+            $sum: {
+              $cond: [
+                {
+                  $eq: [
+                    { $toLower: { $ifNull: ["$empAction", ""] } },
+                    "present",
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
           absent: {
-            $sum: { $cond: [{ $eq: ["$empAction", "Absent"] }, 1, 0] },
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    { $toLower: { $ifNull: ["$empAction", ""] } },
+                    ["absent", "n/a"],
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
           },
         },
       },

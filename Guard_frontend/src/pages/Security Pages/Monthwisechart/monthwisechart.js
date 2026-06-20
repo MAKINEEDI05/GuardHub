@@ -8,6 +8,7 @@ import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import * as XLSX from "xlsx";
 import Loader from "components/Loader";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 const getStatusColor = (status) => {
   switch (status) {
@@ -85,7 +86,7 @@ const MonthWiseChart = () => {
     try {
       console.log(`Fetching attendance for date: ${dateStr}`);
       const response = await fetchWithRetry(
-        `${baseURL}/attendance/get/get-attendace-bydate/${dateStr}`
+        `${baseURL}/attendance/get-attendace-bydate/${dateStr}`
       );
       let attendanceRecords = Array.isArray(response.data.data) ? response.data.data : Array.isArray(response.data) ? response.data : [];
       console.log(`Attendance records for ${dateStr}:`, attendanceRecords);
@@ -335,7 +336,7 @@ const MonthWiseChart = () => {
                 <div className="d-flex align-items-center">
                   <div className="text-center">
                     <img
-                      src={`${baseURL}/emp/uploads/${empId}.JPG`}
+                      src={getEmpImageUrl({ empId })}
                       alt={empName || "Employee"}
                       className="emp-photo"
                       style={{
@@ -347,14 +348,7 @@ const MonthWiseChart = () => {
                         backgroundColor: "#fff",
                         padding: "5px",
                       }}
-                      onError={(e) => {
-                        const currentSrc = e.target.src;
-                        if (currentSrc.endsWith(".JPG")) {
-                          e.target.src = `${baseURL}/emp/uploads/${empId}.jpg`;
-                        } else {
-                          e.target.src = `${baseURL}/emp/uploads/default.jpg`;
-                        }
-                      }}
+                      onError={(e) => handleEmpImageError(e)}
                     />
                   </div>
                   <div className="ms-3">

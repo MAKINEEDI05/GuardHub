@@ -32,6 +32,7 @@ import { debounce } from "lodash";
 import Papa from "papaparse";
 import DOMPurify from "dompurify";
 import Loader from "components/Loader";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 import Flatpickr from "react-flatpickr";
 import "react-toastify/dist/ReactToastify.css";
 import "flatpickr/dist/themes/material_blue.css";
@@ -358,37 +359,24 @@ const MonthWiseReport = ({ setBreadcrumbItems }) => {
         headers: { Authorization: `Bearer ${localStorage.getItem("authToken") || ""}` },
       });
 
-      const { combinedReport } = response.data;
-      if (!combinedReport || typeof combinedReport !== "object") {
-        return { present: 0, absent: 0, leaveDays: 0, od: 0 };
+      // Backend now returns a fully-computed summary sourced from the real
+      // biometric collection (secattendancelogs): present = unique log dates,
+      // absent = total - present - leave - od - weekOff.
+      const { summary } = response.data;
+      if (!summary || typeof summary !== "object") {
+        return { present: 0, absent: 0, leaveDays: 0, od: 0, weekOff: 0 };
       }
 
-      const startYear = startDate.getFullYear();
-      const startMonth = startDate.getMonth() + 1;
-      const endYear = endDate.getFullYear();
-      const endMonth = endDate.getMonth() + 1;
-
-      const isInRange = (year, month) =>
-        (year > startYear || (year === startYear && month >= startMonth)) &&
-        (year < endYear || (year === endYear && month <= endMonth));
-
-      const sumByRange = (arr, field) =>
-        (arr || []).reduce((sum, entry) => {
-          if (isInRange(entry._id.year, entry._id.month)) {
-            return sum + (entry[field] || 0);
-          }
-          return sum;
-        }, 0);
-
       return {
-        present: sumByRange(combinedReport.attendance, "present"),
-        absent: sumByRange(combinedReport.attendance, "absent"),
-        leaveDays: sumByRange(combinedReport.leaves, "totalLeaves"),
-        od: sumByRange(combinedReport.ods, "totalOds"),
+        present: summary.presentDays || 0,
+        absent: summary.absentDays || 0,
+        leaveDays: summary.leaveDays || 0,
+        od: summary.odDays || 0,
+        weekOff: summary.weekOffDays || 0,
       };
     } catch (err) {
       logger.error(`Error in fetchMonthWiseReport for empId ${empId}:`, err);
-      return { present: 0, absent: 0, leaveDays: 0, od: 0 };
+      return { present: 0, absent: 0, leaveDays: 0, od: 0, weekOff: 0 };
     }
   };
 
@@ -436,7 +424,7 @@ const MonthWiseReport = ({ setBreadcrumbItems }) => {
             present: report.present,
             absent: report.absent,
             leaveDays: report.leaveDays,
-            weekOff: countWeekOffDays(fromDate, toDate, empDetails.weekOff),
+            weekOff: report.weekOff,
             remainingCL,
             od: report.od,
           };
@@ -807,7 +795,7 @@ const MonthWiseReport = ({ setBreadcrumbItems }) => {
               <>
                 <div className="text-center mb-3">
                   <img
-                    src={`${API_URL}/emp/uploads/${selectedEmployee.empId}.JPG`}
+                    src={getEmpImageUrl(selectedEmployee)}
                     alt={selectedEmployee.empName || "Employee"}
                     style={{
                       width: "85px",
@@ -818,14 +806,7 @@ const MonthWiseReport = ({ setBreadcrumbItems }) => {
                       backgroundColor: "#fff",
                       padding: "5px",
                     }}
-                    onError={(e) => {
-                      const currentSrc = e.target.src;
-                      if (currentSrc.endsWith(".JPG")) {
-                        e.target.src = `${API_URL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                      } else {
-                        e.target.src = `${API_URL}/emp/uploads/0000.jpg`;
-                      }
-                    }}
+                    onError={(e) => handleEmpImageError(e)}
                   />
                 </div>
                 <Table className="table table-bordered">

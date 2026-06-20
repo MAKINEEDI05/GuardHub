@@ -17,6 +17,9 @@ const addEmpData = async (req, res) => {
       epfNo,
       esiNo,
       address,
+      emergencyContactName,
+      emergencyContactNumber,
+      emergencyContactRelation,
     } = req.body;
     const empImage = req.file ? req.file.filename : null;
     // const empImage = req.file.filename;
@@ -37,6 +40,9 @@ const addEmpData = async (req, res) => {
       address,
       empDob,
       empDoj,
+      emergencyContactName,
+      emergencyContactNumber,
+      emergencyContactRelation,
       empImage,
     });
     console.log("New Employee Data:", newEmployee);

@@ -18,6 +18,9 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import Loader from "components/Loader";
+import { useNavigate } from "react-router-dom";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
+import { friendlyApiError } from "helpers/apiError";
 
 // Base URL for API endpoints
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -55,6 +58,7 @@ const ApplyLeaveForm = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -257,7 +261,8 @@ const ApplyLeaveForm = () => {
       setSubmitting(true);
       const response = await axios.post(
         `${BASE_URL}/leave/apply-leave`,
-        payload
+        payload,
+        { timeout: 15000 }
       );
       console.log("Server response:", response.data);
 
@@ -283,13 +288,11 @@ const ApplyLeaveForm = () => {
       });
       setSelectedEmployee(null);
       setSearchTerm("");
+      // Take the user to the records list so they can see the new entry.
+      setTimeout(() => navigate("/LeaveOdManagement"), 1200);
     } catch (error) {
       console.error("Error submitting leave:", error);
-      const errorMessage =
-        error.response?.data?.message ||
-        error.message ||
-        "Failed to apply leave";
-      toast.error(`Error: ${errorMessage}`, {
+      toast.error(friendlyApiError(error, { fallback: "Failed to apply leave" }), {
         position: "top-right",
         autoClose: 5000,
       });
@@ -345,7 +348,7 @@ const ApplyLeaveForm = () => {
   });
 
   const getImageSrc = (emp) => {
-    return `${BASE_URL}/emp/uploads/${emp.empId}.JPG`;
+    return getEmpImageUrl(emp);
   };
 
   return (
@@ -360,7 +363,7 @@ const ApplyLeaveForm = () => {
             <Row className="justify-content-center">
               <Col md={6}>
                 <FormGroup>
-                  <Label>Employee ID</Label>
+                  <Label>Search Employee (ID or Name)</Label>
                   <div className="position-relative">
                     <input
                       type="text"
@@ -393,14 +396,31 @@ const ApplyLeaveForm = () => {
                           {filteredEmployees.map((emp, idx) => (
                             <li
                               key={emp.empId}
-                              className={`list-group-item list-group-item-action ${
+                              className={`list-group-item list-group-item-action d-flex align-items-center ${
                                 idx === highlightIndex ? "active" : ""
                               }`}
                               onClick={() => handleSelectEmployee(emp.empId)}
-                              style={{ cursor: "pointer" }}
+                              style={{ cursor: "pointer", gap: "10px" }}
                             >
-                              {String(emp.empId)} - {emp.empName} (
-                              {emp.empDesignation})
+                              <img
+                                src={getEmpImageUrl(emp)}
+                                onError={(e) => handleEmpImageError(e)}
+                                alt=""
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                  flex: "0 0 auto",
+                                }}
+                              />
+                              <span>
+                                <strong>{String(emp.empId)}</strong> —{" "}
+                                {emp.empName}{" "}
+                                <small className="opacity-75">
+                                  ({emp.empDesignation})
+                                </small>
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -442,14 +462,7 @@ const ApplyLeaveForm = () => {
                     height: "100px",
                     objectFit: "cover",
                   }}
-                  onError={(e) => {
-                    const currentSrc = e.target.src;
-                    if (currentSrc.endsWith(".JPG")) {
-                      e.target.src = `${BASE_URL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                    } else {
-                      e.target.src = `${BASE_URL}/emp/uploads/0000.jpg`;
-                    }
-                  }}
+                  onError={(e) => handleEmpImageError(e)}
                 />
                 <p>
                   <strong>Emp ID:</strong> {selectedEmployee.empId} |{" "}

@@ -18,6 +18,7 @@ import axios from "axios";
 import { parse, format, isValid } from "date-fns";
 import Loader from "components/Loader"; // Adjust the import path if necessary
 import img from "./0000.jpg";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Utility function to parse and format dates
 const parseAndFormatDate = (dateStr, outputFormat = "dd-MM-yyyy") => {
@@ -94,6 +95,7 @@ const Profile = (props) => {
   const [existingEmpIds, setExistingEmpIds] = useState([]);
   const [viewModal, setViewModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [rawEmployees, setRawEmployees] = useState([]);
 
   const breadcrumbItems = useMemo(
     () => [
@@ -147,6 +149,7 @@ const Profile = (props) => {
     try {
       const res = await axios.get(`${baseURL}/emp/get-emp-details`, { signal });
       const employees = res.data;
+      setRawEmployees(Array.isArray(employees) ? employees : []);
 
       // Log raw empDob and empDoj for debugging
       employees.forEach((emp) => {
@@ -159,7 +162,7 @@ const Profile = (props) => {
         image: (
           <div className="text-center">
             <img
-              src={`${baseURL}/emp/uploads/${emp.empId}.JPG`}
+              src={getEmpImageUrl(emp)}
               alt={emp.empName || "Employee"}
               style={{
                 width: "85px",
@@ -170,30 +173,7 @@ const Profile = (props) => {
                 backgroundColor: "#fff",
                 padding: "1px",
               }}
-              onError={(e) => {
-                const currentSrc = e.target.src;
-                if (currentSrc.endsWith(".JPG")) {
-                  e.target.src = `${baseURL}/emp/uploads/${emp.empId}.jpg`;
-                } else if (currentSrc.endsWith(".jpg")) {
-                  // Try .png next if .jpg also fails
-                  e.target.src = `${baseURL}/emp/uploads/${emp.empId}.png`;
-                } else {
-                  e.target.src = img; // fallback default
-                }
-              }}
-              // onError={(e) => {
-              //   const exts = ["JPG", "jpg", "jpeg", "png", "webp"];
-              //   const currentSrc = e.target.src;
-              //   const currentExt = currentSrc.split(".").pop().toLowerCase();
-              //   const currentIndex = exts.indexOf(currentExt);
-              //   const nextExt = exts[currentIndex + 1];
-
-              //   if (nextExt) {
-              //     e.target.src = `${baseURL}/emp/uploads/${emp.empId}.${nextExt}`;
-              //   } else {
-              //     e.target.src = `${baseURL}/emp/uploads/0000.jpg`; // fallback default
-              //   }
-              // }}
+              onError={(e) => handleEmpImageError(e, img)}
             />
           </div>
         ),
@@ -264,6 +244,12 @@ const Profile = (props) => {
                     epfNo: response.data.epfNo || "N/A",
                     esiNo: response.data.esiNo || "N/A",
                     address: response.data.address || "N/A",
+                    emergencyContactName:
+                      response.data.emergencyContactName || "N/A",
+                    emergencyContactNumber:
+                      response.data.emergencyContactNumber || "N/A",
+                    emergencyContactRelation:
+                      response.data.emergencyContactRelation || "N/A",
                   });
                   setViewModal(true);
                 } catch (err) {
@@ -581,6 +567,63 @@ const Profile = (props) => {
     link.click();
   };
 
+  // Export the employee list to CSV. Respects the current search filter and
+  // uses the same column layout as the sample CSV so it can be re-imported.
+  const exportToCSV = () => {
+    const term = searchTerm.trim().toLowerCase();
+    const source = term
+      ? rawEmployees.filter((e) =>
+          [
+            e.empId,
+            e.empName,
+            e.empDepartment,
+            e.empDesignation,
+            e.empMobileNo,
+          ].some((v) => String(v ?? "").toLowerCase().includes(term))
+        )
+      : rawEmployees;
+
+    if (!source.length) {
+      toast.info("No employee data to export", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    const data = source.map((e) => ({
+      empId: e.empId ?? "",
+      empName: e.empName ?? "",
+      empDepartment: e.empDepartment ?? "",
+      empDesignation: e.empDesignation ?? "",
+      empMobileNo: e.empMobileNo != null ? String(e.empMobileNo).split(".")[0] : "",
+      empAadharNo: e.empAadharNo != null ? String(e.empAadharNo).split(".")[0] : "",
+      empPanNo: e.empPanNo ?? "",
+      empDob: parseAndFormatDate(e.empDob),
+      empDoj: parseAndFormatDate(e.empDoj),
+      bankAccountNo:
+        e.bankAccountNo != null ? String(e.bankAccountNo).split(".")[0] : "",
+      epfNo: e.epfNo ?? "",
+      esiNo: e.esiNo ?? "",
+      address: e.address ?? "",
+      emergencyContactName: e.emergencyContactName ?? "",
+      emergencyContactNumber: e.emergencyContactNumber ?? "",
+      emergencyContactRelation: e.emergencyContactRelation ?? "",
+    }));
+
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `employees_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(`Exported ${data.length} employee record(s)`, {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  };
+
   const filteredRowsMemo = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
     return tableData.rows.filter(
@@ -717,6 +760,15 @@ const Profile = (props) => {
           </Button>
           <Button color="info" onClick={downloadSampleCsv} disabled={loading}>
             Download Sample CSV
+          </Button>
+          <Button
+            color="secondary"
+            onClick={exportToCSV}
+            disabled={loading || rawEmployees.length === 0}
+            aria-label="Export employee data as CSV"
+          >
+            <i className="mdi mdi-download me-1" />
+            Export Data
           </Button>
           <input
             type="file"
@@ -989,7 +1041,7 @@ const Profile = (props) => {
             <div className="employee-details-card">
               <div className="text-center mb-4">
                 <img
-                  src={`${baseURL}/emp/uploads/${selectedEmployee.empId}.JPG`}
+                  src={getEmpImageUrl(selectedEmployee)}
                   alt={selectedEmployee.empName}
                   style={{
                     width: "120px",
@@ -999,17 +1051,7 @@ const Profile = (props) => {
                     border: "2px solid skyblue",
                     marginBottom: "10px",
                   }}
-                  onError={(e) => {
-                    const currentSrc = e.target.src;
-                    if (currentSrc.endsWith(".JPG")) {
-                      e.target.src = `${baseURL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                    } else if (currentSrc.endsWith(".jpg")) {
-                      // Try .png next if .jpg also fails
-                      e.target.src = `${baseURL}/emp/uploads/${selectedEmployee.empId}.png`;
-                    } else {
-                      e.target.src = img; // fallback default
-                    }
-                  }}
+                  onError={(e) => handleEmpImageError(e, img)}
                 />
                 <h4 className="mb-1">{selectedEmployee.empName}</h4>
                 <p className="text-muted">{selectedEmployee.empDesignation}</p>
@@ -1084,6 +1126,32 @@ const Profile = (props) => {
                 <span className="detail-label">Address:</span>
                 <span className="detail-value">{selectedEmployee.address}</span>
               </div>
+              <Row className="mt-3">
+                <Col md={4}>
+                  <div className="detail-item">
+                    <span className="detail-label">Emergency Contact:</span>
+                    <span className="detail-value">
+                      {selectedEmployee.emergencyContactName}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="detail-item">
+                    <span className="detail-label">Emergency Number:</span>
+                    <span className="detail-value">
+                      {selectedEmployee.emergencyContactNumber}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="detail-item">
+                    <span className="detail-label">Relation:</span>
+                    <span className="detail-value">
+                      {selectedEmployee.emergencyContactRelation}
+                    </span>
+                  </div>
+                </Col>
+              </Row>
             </div>
           ) : (
             <p className="text-center text-muted">

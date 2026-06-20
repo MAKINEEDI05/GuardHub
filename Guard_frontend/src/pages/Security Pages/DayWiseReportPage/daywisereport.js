@@ -43,6 +43,7 @@ import "./daywisereport.css";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
 import { useNavigate } from "react-router-dom";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
 
 // Constants for shift and week off options, API settings
 const SHIFT_OPTIONS = ["General", "Shift-A", "Shift-B", "Shift-C"];
@@ -65,6 +66,20 @@ const BREADCRUMB_ITEMS = [
 const API_URL = process.env.REACT_APP_API_BASE_URL;
 const MAX_RETRIES = 3;
 const RETRY_DELAY = 1000;
+
+// Attendance status is stored with inconsistent casing/synonyms across the
+// biometric (cron) path ("present"/"N/A"/"On Leave") and the manual path
+// ("Present"/"Absent"/"Leave"). Normalise for display so the column is reliable.
+const normalizeAction = (action) => {
+  if (!action) return "--";
+  const a = String(action).trim().toLowerCase();
+  if (a === "present") return "Present";
+  if (a === "absent" || a === "n/a") return "Absent";
+  if (a === "leave" || a === "on leave") return "Leave";
+  if (a === "week off" || a === "weekoff") return "Week Off";
+  if (a === "od") return "OD";
+  return action;
+};
 
 // HTTP Status Codes
 const HTTP_STATUS = {
@@ -585,7 +600,7 @@ const DayWiseReport = ({ setBreadcrumbItems }) => {
             weekOff: record.empWeekOff || "Sunday",
             inTime: record.empInTime || "--",
             outTime: record.empOutTime || "--",
-            action: record.empAction || "--",
+            action: normalizeAction(record.empAction),
           };
         });
 
@@ -1415,7 +1430,7 @@ const DayWiseReport = ({ setBreadcrumbItems }) => {
                   <div className="employee-image-container">
                     <div className="text-center">
                       <img
-                        src={`${API_URL}/emp/uploads/${selectedEmployee.empId}.JPG`}
+                        src={getEmpImageUrl(selectedEmployee)}
                         alt={selectedEmployee.empName || "Employee"}
                         style={{
                           width: "85px",
@@ -1426,14 +1441,7 @@ const DayWiseReport = ({ setBreadcrumbItems }) => {
                           backgroundColor: "#fff",
                           padding: "5px",
                         }}
-                        onError={(e) => {
-                          const currentSrc = e.target.src;
-                          if (currentSrc.endsWith(".JPG")) {
-                            e.target.src = `${API_URL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                          } else {
-                            e.target.src = `${API_URL}/emp/uploads/0000.jpg`;
-                          }
-                        }}
+                        onError={(e) => handleEmpImageError(e)}
                       />
                     </div>
                   </div>
@@ -1637,7 +1645,7 @@ const DayWiseReport = ({ setBreadcrumbItems }) => {
                         <div className="employee-image-container">
                           <div className="text-center">
                             <img
-                              src={`${API_URL}/emp/uploads/${employeeBasicDetails.empId}.JPG`}
+                              src={getEmpImageUrl(employeeBasicDetails)}
                               alt={employeeBasicDetails.name || "Employee"}
                               style={{
                                 width: "85px",
@@ -1648,14 +1656,7 @@ const DayWiseReport = ({ setBreadcrumbItems }) => {
                                 backgroundColor: "#fff",
                                 padding: "5px",
                               }}
-                              onError={(e) => {
-                                const currentSrc = e.target.src;
-                                if (currentSrc.endsWith(".JPG")) {
-                                  e.target.src = `${API_URL}/emp/uploads/${employeeBasicDetails.empId}.jpg`;
-                                } else {
-                                  e.target.src = `${API_URL}/emp/uploads/0000.jpg`;
-                                }
-                              }}
+                              onError={(e) => handleEmpImageError(e)}
                             />
                           </div>
                         </div>

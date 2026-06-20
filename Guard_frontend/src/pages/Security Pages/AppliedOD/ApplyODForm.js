@@ -18,6 +18,9 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import Loader from "components/Loader";
+import { useNavigate } from "react-router-dom";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
+import { friendlyApiError } from "helpers/apiError";
 
 // Base URL for API endpoints
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -31,7 +34,7 @@ const ApplyODForm = () => {
     toDate: "",
     reason: "",
     reasonCount: 0,
-    emergency: false,
+    location: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -46,6 +49,7 @@ const ApplyODForm = () => {
     odType: null,
     fromDate: null,
     toDate: null,
+    location: null,
     reason: null,
   });
 
@@ -53,6 +57,7 @@ const ApplyODForm = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -217,6 +222,7 @@ const ApplyODForm = () => {
       toDate:
         formData.toDate !== "" &&
         new Date(formData.toDate) >= new Date(formData.fromDate),
+      location: formData.location.trim() !== "",
       reason: formData.reason.trim().length >= 10,
     };
 
@@ -244,11 +250,14 @@ const ApplyODForm = () => {
       empFromDate: formData.fromDate.toISOString().split("T")[0],
       empToDate: formData.toDate.toISOString().split("T")[0],
       empPurpose: formData.reason,
+      odLocation: formData.location.trim(),
     };
 
     try {
       setSubmitting(true);
-      const response = await axios.post(`${BASE_URL}/od/apply-od`, payload);
+      const response = await axios.post(`${BASE_URL}/od/apply-od`, payload, {
+        timeout: 15000,
+      });
       console.log("Server response:", response.data);
 
       toast.success("OD applied successfully!", {
@@ -268,15 +277,15 @@ const ApplyODForm = () => {
         toDate: "",
         reason: "",
         reasonCount: 0,
-        emergency: false,
+        location: "",
       });
       setSelectedEmployee(null);
       setSearchTerm("");
+      // Take the user to the records list so they can see the new entry.
+      setTimeout(() => navigate("/LeaveOdManagement"), 1200);
     } catch (error) {
       console.error("Error submitting OD:", error);
-      const errorMessage =
-        error.response?.data?.message || error.message || "Failed to apply OD";
-      toast.error(`Error: ${errorMessage}`, {
+      toast.error(friendlyApiError(error, { fallback: "Failed to apply OD" }), {
         position: "top-right",
         autoClose: 5000,
       });
@@ -332,7 +341,7 @@ const ApplyODForm = () => {
   });
 
   const getImageSrc = (emp) => {
-    return `${BASE_URL}/emp/uploads/${emp.empId}.JPG`;
+    return getEmpImageUrl(emp);
   };
 
   return (
@@ -347,7 +356,7 @@ const ApplyODForm = () => {
             <Row className="justify-content-center">
               <Col md={6}>
                 <FormGroup>
-                  <Label>Employee ID</Label>
+                  <Label>Search Employee (ID or Name)</Label>
                   <div className="position-relative">
                     <input
                       type="text"
@@ -380,14 +389,31 @@ const ApplyODForm = () => {
                           {filteredEmployees.map((emp, idx) => (
                             <li
                               key={emp.empId}
-                              className={`list-group-item list-group-item-action ${
+                              className={`list-group-item list-group-item-action d-flex align-items-center ${
                                 idx === highlightIndex ? "active" : ""
                               }`}
                               onClick={() => handleSelectEmployee(emp.empId)}
-                              style={{ cursor: "pointer" }}
+                              style={{ cursor: "pointer", gap: "10px" }}
                             >
-                              {String(emp.empId)} - {emp.empName} (
-                              {emp.empDesignation})
+                              <img
+                                src={getEmpImageUrl(emp)}
+                                onError={(e) => handleEmpImageError(e)}
+                                alt=""
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                  flex: "0 0 auto",
+                                }}
+                              />
+                              <span>
+                                <strong>{String(emp.empId)}</strong> —{" "}
+                                {emp.empName}{" "}
+                                <small className="opacity-75">
+                                  ({emp.empDesignation})
+                                </small>
+                              </span>
                             </li>
                           ))}
                         </ul>
@@ -429,14 +455,7 @@ const ApplyODForm = () => {
                     height: "100px",
                     objectFit: "cover",
                   }}
-                  onError={(e) => {
-                    const currentSrc = e.target.src;
-                    if (currentSrc.endsWith(".JPG")) {
-                      e.target.src = `${BASE_URL}/emp/uploads/${selectedEmployee.empId}.jpg`;
-                    } else {
-                      e.target.src = `${BASE_URL}/emp/uploads/0000.jpg`;
-                    }
-                  }}
+                  onError={(e) => handleEmpImageError(e)}
                 />
                 <p>
                   <strong>Emp ID:</strong> {selectedEmployee.empId} |{" "}
@@ -548,25 +567,27 @@ const ApplyODForm = () => {
                   </FormGroup>
                 </Col>
               </Row>
-              <Row>
-                <Col md={6}>
-                  <FormGroup>
-                    <Label>Emergency OD?</Label>
-                    <div>
-                      <Switch
-                        uncheckedIcon={<Offsymbol />}
-                        checkedIcon={<OnSymbol />}
-                        onColor="#02a499"
-                        onChange={() =>
-                          handleChange("emergency", !formData.emergency)
-                        }
-                        checked={formData.emergency}
-                        disabled={submitting}
-                      />
-                    </div>
-                  </FormGroup>
-                </Col>
-              </Row>
+              <FormGroup>
+                <Label>
+                  OD Location <span className="text-danger">*</span>
+                </Label>
+                <input
+                  type="text"
+                  className={`form-control ${
+                    isValid.location === false ? "is-invalid" : ""
+                  }`}
+                  value={formData.location}
+                  onChange={(e) => handleChange("location", e.target.value)}
+                  placeholder="Enter OD work location (e.g. Main Gate, Admin Building)"
+                  maxLength="120"
+                  disabled={submitting}
+                />
+                {isValid.location === false && (
+                  <div className="invalid-feedback">
+                    Please enter OD location
+                  </div>
+                )}
+              </FormGroup>
               <FormGroup>
                 <Label>Reason</Label>
                 <textarea
