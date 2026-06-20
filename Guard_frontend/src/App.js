@@ -1,5 +1,5 @@
 import PropTypes from 'prop-types'
-import React from "react"
+import React, { Suspense } from "react"
 
 import { Route, Routes } from "react-router-dom"
 import { connect } from "react-redux"
@@ -74,7 +74,23 @@ const App = props => {
   return (
     <React.Fragment>
       <ThemeToggle />
-      <Routes>
+      <Suspense
+        fallback={
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              minHeight: "60vh",
+            }}
+          >
+            <div className="spinner-border text-primary" role="status">
+              <span className="visually-hidden">Loading…</span>
+            </div>
+          </div>
+        }
+      >
+        <Routes>
       {/* Non-authenticated routes */}
       {authRoutes.map((route, idx) => (
         <Route
@@ -101,6 +117,7 @@ const App = props => {
         />
       ))}
     </Routes>
+      </Suspense>
     </React.Fragment>
   )
 }
