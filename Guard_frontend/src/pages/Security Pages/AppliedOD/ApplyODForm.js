@@ -356,7 +356,7 @@ const ApplyODForm = () => {
             <Row className="justify-content-center">
               <Col md={6}>
                 <FormGroup>
-                  <Label>Employee ID</Label>
+                  <Label>Search Employee (ID or Name)</Label>
                   <div className="position-relative">
                     <input
                       type="text"
@@ -389,14 +389,31 @@ const ApplyODForm = () => {
                           {filteredEmployees.map((emp, idx) => (
                             <li
                               key={emp.empId}
-                              className={`list-group-item list-group-item-action ${
+                              className={`list-group-item list-group-item-action d-flex align-items-center ${
                                 idx === highlightIndex ? "active" : ""
                               }`}
                               onClick={() => handleSelectEmployee(emp.empId)}
-                              style={{ cursor: "pointer" }}
+                              style={{ cursor: "pointer", gap: "10px" }}
                             >
-                              {String(emp.empId)} - {emp.empName} (
-                              {emp.empDesignation})
+                              <img
+                                src={getEmpImageUrl(emp)}
+                                onError={(e) => handleEmpImageError(e)}
+                                alt=""
+                                style={{
+                                  width: 32,
+                                  height: 32,
+                                  borderRadius: "50%",
+                                  objectFit: "cover",
+                                  flex: "0 0 auto",
+                                }}
+                              />
+                              <span>
+                                <strong>{String(emp.empId)}</strong> —{" "}
+                                {emp.empName}{" "}
+                                <small className="opacity-75">
+                                  ({emp.empDesignation})
+                                </small>
+                              </span>
                             </li>
                           ))}
                         </ul>
