@@ -364,6 +364,14 @@ const EmployeeForm = () => {
             </div>
 
             <div className="form-container">
+              <div className="alert alert-info d-flex align-items-center" role="note">
+                <i className="mdi mdi-information-outline me-2" />
+                <span>
+                  Only <strong>Employee Name</strong> and{" "}
+                  <strong>Employee ID</strong> are required. Remaining details
+                  can be updated later from the employee profile.
+                </span>
+              </div>
               <AvForm
                 ref={formRef}
                 onValidSubmit={handleValidSubmit}
@@ -435,7 +443,13 @@ const EmployeeForm = () => {
                     <AvField
                       className="mb-3"
                       name="empName"
-                      label="Employee Name"
+                      label={
+                        <span>
+                          Employee Name{" "}
+                          <span className="text-danger">*</span>{" "}
+                          <small className="text-muted">(Required)</small>
+                        </span>
+                      }
                       placeholder="Enter full name"
                       type="text"
                       value={formData.empName}
@@ -461,7 +475,10 @@ const EmployeeForm = () => {
                   </Col>
                   <Col md={6}>
                     <AvGroup className="mb-3">
-                      <Label for="empId">Employee ID</Label>
+                      <Label for="empId">
+                        Employee ID <span className="text-danger">*</span>{" "}
+                        <small className="text-muted">(Required)</small>
+                      </Label>
                       <AvField
                         name="empId"
                         type="text"
@@ -509,7 +526,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Designation is required",
                         },
                       }}
@@ -538,7 +555,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Department is required",
                         },
                       }}
@@ -570,7 +587,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Mobile Number is required",
                         },
                         pattern: {
@@ -597,7 +614,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Aadhar Number is required",
                         },
                         pattern: {
@@ -651,7 +668,7 @@ const EmployeeForm = () => {
                       }
                       validate={{
                         required: {
-                          value: true,
+                          value: false,
                           errorMessage: "Bank Account Number is required",
                         },
                         pattern: {
@@ -738,7 +755,7 @@ const EmployeeForm = () => {
                         value={formData.empDob}
                         validate={{
                           required: {
-                            value: true,
+                            value: false,
                             errorMessage: "Date of Birth is required",
                           },
                         }}
@@ -771,7 +788,7 @@ const EmployeeForm = () => {
                         value={formData.empDoj}
                         validate={{
                           required: {
-                            value: true,
+                            value: false,
                             errorMessage: "Date of Joining is required",
                           },
                         }}
@@ -791,7 +808,7 @@ const EmployeeForm = () => {
                   }
                   validate={{
                     required: {
-                      value: true,
+                      value: false,
                       errorMessage: "Address is required",
                     },
                     minLength: {

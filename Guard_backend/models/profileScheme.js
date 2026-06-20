@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 
-// Security Schema
+// Security (employee) schema.
+// Only empId and empName are mandatory; every other detail is optional and can
+// be filled in later from the employee profile. Existing documents already
+// carry these values, so relaxing the constraints does not affect stored data.
 const EmpDetails = new mongoose.Schema(
   {
     empId: {
@@ -14,15 +17,15 @@ const EmpDetails = new mongoose.Schema(
 
     empDesignation: {
       type: String,
-      required: true,
+      required: false,
     },
     empDepartment: {
       type: String,
-      required: true,
+      required: false,
     },
     bankAccountNo: {
       type: Number,
-      required: true,
+      required: false,
     },
     epfNo: {
       type: String,
@@ -34,16 +37,16 @@ const EmpDetails = new mongoose.Schema(
     },
     address: {
       type: String,
-      required: true,
+      required: false,
     },
 
     empMobileNo: {
       type: Number,
-      required: true,
+      required: false,
     },
     empAadharNo: {
       type: Number,
-      required: true,
+      required: false,
     },
     empPanNo: {
       type: String,
@@ -51,11 +54,11 @@ const EmpDetails = new mongoose.Schema(
     },
     empDob: {
       type: Date,
-      required: true,
+      required: false,
     },
     empDoj: {
       type: String,
-      required: true,
+      required: false,
     },
     empImage: {
       type: String,
