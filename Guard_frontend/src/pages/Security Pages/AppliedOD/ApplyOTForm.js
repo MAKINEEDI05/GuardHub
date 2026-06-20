@@ -16,6 +16,8 @@ import axios from "axios";
 import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import Loader from "components/Loader";
+import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
+import { friendlyApiError } from "helpers/apiError";
 
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
 
@@ -133,7 +135,7 @@ const ApplyOTForm = () => {
 
     try {
       setSubmitting(true);
-      await axios.post(`${BASE_URL}/ot/apply-ot`, payload);
+      await axios.post(`${BASE_URL}/ot/apply-ot`, payload, { timeout: 15000 });
       toast.success("OT applied successfully!", {
         position: "top-right",
         autoClose: 3000,
@@ -142,12 +144,10 @@ const ApplyOTForm = () => {
       setSelectedEmployee(null);
       setIsValid({});
     } catch (err) {
-      const msg =
-        err.response?.data?.errors?.join(", ") ||
-        err.response?.data?.message ||
-        err.message ||
-        "Failed to apply OT";
-      toast.error(`Error: ${msg}`, { position: "top-right", autoClose: 4000 });
+      toast.error(friendlyApiError(err, { fallback: "Failed to apply OT" }), {
+        position: "top-right",
+        autoClose: 4000,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -190,14 +190,34 @@ const ApplyOTForm = () => {
           </Row>
 
           {selectedEmployee && (
-            <Row className="mb-2">
-              <Col md={4}>
+            <Row className="mb-2 align-items-center">
+              <Col xs="auto">
+                <img
+                  src={getEmpImageUrl(selectedEmployee)}
+                  alt={selectedEmployee.empName || "Employee"}
+                  onError={(e) => handleEmpImageError(e)}
+                  style={{
+                    width: 64,
+                    height: 64,
+                    borderRadius: "50%",
+                    objectFit: "cover",
+                    border: "1px solid #ccc",
+                  }}
+                />
+              </Col>
+              <Col md={3}>
+                <FormGroup>
+                  <Label>Employee ID</Label>
+                  <Input value={selectedEmployee.empId || "—"} disabled />
+                </FormGroup>
+              </Col>
+              <Col md={3}>
                 <FormGroup>
                   <Label>Employee Name</Label>
                   <Input value={selectedEmployee.empName || "—"} disabled />
                 </FormGroup>
               </Col>
-              <Col md={4}>
+              <Col md={3}>
                 <FormGroup>
                   <Label>Designation</Label>
                   <Input
@@ -206,7 +226,7 @@ const ApplyOTForm = () => {
                   />
                 </FormGroup>
               </Col>
-              <Col md={4}>
+              <Col md={3}>
                 <FormGroup>
                   <Label>Department</Label>
                   <Input
