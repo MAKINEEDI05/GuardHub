@@ -11,6 +11,7 @@ const addOd = async (req, res) => {
       empShiftType,
       empOdType,
       empPurpose,
+      odLocation,
     } = req.body;
 
     const newOd = new od({
@@ -20,6 +21,7 @@ const addOd = async (req, res) => {
       empShiftType,
       empOdType,
       empPurpose,
+      odLocation: odLocation || "Not Specified",
     });
 
     await newOd.save();
