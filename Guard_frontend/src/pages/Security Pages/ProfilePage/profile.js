@@ -244,6 +244,12 @@ const Profile = (props) => {
                     epfNo: response.data.epfNo || "N/A",
                     esiNo: response.data.esiNo || "N/A",
                     address: response.data.address || "N/A",
+                    emergencyContactName:
+                      response.data.emergencyContactName || "N/A",
+                    emergencyContactNumber:
+                      response.data.emergencyContactNumber || "N/A",
+                    emergencyContactRelation:
+                      response.data.emergencyContactRelation || "N/A",
                   });
                   setViewModal(true);
                 } catch (err) {
@@ -600,6 +606,9 @@ const Profile = (props) => {
       epfNo: e.epfNo ?? "",
       esiNo: e.esiNo ?? "",
       address: e.address ?? "",
+      emergencyContactName: e.emergencyContactName ?? "",
+      emergencyContactNumber: e.emergencyContactNumber ?? "",
+      emergencyContactRelation: e.emergencyContactRelation ?? "",
     }));
 
     const csv = Papa.unparse(data);
@@ -1117,6 +1126,32 @@ const Profile = (props) => {
                 <span className="detail-label">Address:</span>
                 <span className="detail-value">{selectedEmployee.address}</span>
               </div>
+              <Row className="mt-3">
+                <Col md={4}>
+                  <div className="detail-item">
+                    <span className="detail-label">Emergency Contact:</span>
+                    <span className="detail-value">
+                      {selectedEmployee.emergencyContactName}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="detail-item">
+                    <span className="detail-label">Emergency Number:</span>
+                    <span className="detail-value">
+                      {selectedEmployee.emergencyContactNumber}
+                    </span>
+                  </div>
+                </Col>
+                <Col md={4}>
+                  <div className="detail-item">
+                    <span className="detail-label">Relation:</span>
+                    <span className="detail-value">
+                      {selectedEmployee.emergencyContactRelation}
+                    </span>
+                  </div>
+                </Col>
+              </Row>
             </div>
           ) : (
             <p className="text-center text-muted">

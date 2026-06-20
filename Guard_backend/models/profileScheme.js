@@ -60,6 +60,19 @@ const EmpDetails = new mongoose.Schema(
       type: String,
       required: false,
     },
+    // Emergency contact (all optional; can be filled in later).
+    emergencyContactName: {
+      type: String,
+      required: false,
+    },
+    emergencyContactNumber: {
+      type: String,
+      required: false,
+    },
+    emergencyContactRelation: {
+      type: String,
+      required: false,
+    },
     empImage: {
       type: String,
       required: false,
