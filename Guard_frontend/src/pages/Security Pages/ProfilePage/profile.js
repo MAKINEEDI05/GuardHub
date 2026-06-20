@@ -95,6 +95,7 @@ const Profile = (props) => {
   const [existingEmpIds, setExistingEmpIds] = useState([]);
   const [viewModal, setViewModal] = useState(false);
   const [selectedEmployee, setSelectedEmployee] = useState(null);
+  const [rawEmployees, setRawEmployees] = useState([]);
 
   const breadcrumbItems = useMemo(
     () => [
@@ -148,6 +149,7 @@ const Profile = (props) => {
     try {
       const res = await axios.get(`${baseURL}/emp/get-emp-details`, { signal });
       const employees = res.data;
+      setRawEmployees(Array.isArray(employees) ? employees : []);
 
       // Log raw empDob and empDoj for debugging
       employees.forEach((emp) => {
@@ -559,6 +561,60 @@ const Profile = (props) => {
     link.click();
   };
 
+  // Export the employee list to CSV. Respects the current search filter and
+  // uses the same column layout as the sample CSV so it can be re-imported.
+  const exportToCSV = () => {
+    const term = searchTerm.trim().toLowerCase();
+    const source = term
+      ? rawEmployees.filter((e) =>
+          [
+            e.empId,
+            e.empName,
+            e.empDepartment,
+            e.empDesignation,
+            e.empMobileNo,
+          ].some((v) => String(v ?? "").toLowerCase().includes(term))
+        )
+      : rawEmployees;
+
+    if (!source.length) {
+      toast.info("No employee data to export", {
+        position: "top-right",
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    const data = source.map((e) => ({
+      empId: e.empId ?? "",
+      empName: e.empName ?? "",
+      empDepartment: e.empDepartment ?? "",
+      empDesignation: e.empDesignation ?? "",
+      empMobileNo: e.empMobileNo != null ? String(e.empMobileNo).split(".")[0] : "",
+      empAadharNo: e.empAadharNo != null ? String(e.empAadharNo).split(".")[0] : "",
+      empPanNo: e.empPanNo ?? "",
+      empDob: parseAndFormatDate(e.empDob),
+      empDoj: parseAndFormatDate(e.empDoj),
+      bankAccountNo:
+        e.bankAccountNo != null ? String(e.bankAccountNo).split(".")[0] : "",
+      epfNo: e.epfNo ?? "",
+      esiNo: e.esiNo ?? "",
+      address: e.address ?? "",
+    }));
+
+    const csv = Papa.unparse(data);
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8;" });
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `employees_${new Date().toISOString().split("T")[0]}.csv`;
+    link.click();
+    URL.revokeObjectURL(link.href);
+    toast.success(`Exported ${data.length} employee record(s)`, {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  };
+
   const filteredRowsMemo = useMemo(() => {
     const lowerSearch = searchTerm.toLowerCase();
     return tableData.rows.filter(
@@ -695,6 +751,15 @@ const Profile = (props) => {
           </Button>
           <Button color="info" onClick={downloadSampleCsv} disabled={loading}>
             Download Sample CSV
+          </Button>
+          <Button
+            color="secondary"
+            onClick={exportToCSV}
+            disabled={loading || rawEmployees.length === 0}
+            aria-label="Export employee data as CSV"
+          >
+            <i className="mdi mdi-download me-1" />
+            Export Data
           </Button>
           <input
             type="file"
