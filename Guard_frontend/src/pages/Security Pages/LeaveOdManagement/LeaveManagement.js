@@ -64,7 +64,7 @@ const LeaveManagement = () => {
     empShiftType: "",
     empOdType: "",
     empReason: "",
-    emergency: false,
+    odLocation: "",
   });
 
   // State for delete confirmation modal
@@ -128,7 +128,7 @@ const LeaveManagement = () => {
         empShiftType: item.empShiftType || "",
         empOdType: item.empOdType || "",
         empReason: item.empReason || "",
-        emergency: item.emergency || false,
+        odLocation: "",
       }));
 
       // Handle OD response
@@ -145,7 +145,7 @@ const LeaveManagement = () => {
         empShiftType: item.empShiftType || "",
         empOdType: item.empOdType || "",
         empReason: item.empPurpose || "",
-        emergency: item.emergency || false,
+        odLocation: item.odLocation || "Not Specified",
       }));
 
       const allEntries = [...mappedLeaves, ...mappedOds];
@@ -246,7 +246,7 @@ const LeaveManagement = () => {
         empShiftType: entry.empShiftType || "",
         empOdType: entry.empOdType || "",
         empReason: entry.empReason || "",
-        emergency: entry.emergency || false,
+        odLocation: entry.odLocation || "",
       });
       setEditModal(true);
     } catch (error) {
@@ -275,6 +275,10 @@ const LeaveManagement = () => {
       empToDate:
         editFormData.empToDate !== null &&
         new Date(editFormData.empToDate) >= new Date(editFormData.empFromDate),
+      odLocation:
+        editFormData.type === "OD"
+          ? (editFormData.odLocation || "").trim() !== ""
+          : true,
       empReason: editFormData.empReason.trim().length >= 10,
     };
     return Object.values(validation).every((value) => value === true);
@@ -302,7 +306,10 @@ const LeaveManagement = () => {
               empLeaveType: editFormData.empLeaveType,
               empReason: editFormData.empReason,
             }
-          : { empPurpose: editFormData.empReason }),
+          : {
+              empPurpose: editFormData.empReason,
+              odLocation: editFormData.odLocation,
+            }),
       };
 
       const endpoint =
@@ -558,7 +565,7 @@ const LeaveManagement = () => {
                     <th>To Date</th>
                     <th>Shift Type</th>
                     <th>Duration</th>
-                    <th>Emergency</th>
+                    <th>Location</th>
                     <th>Actions</th>
                   </tr>
                 </thead>
@@ -595,7 +602,11 @@ const LeaveManagement = () => {
                         <td>{formatDate(entry.empToDate)}</td>
                         <td>{entry.empShiftType || "-"}</td>
                         <td>{entry.empOdType || "-"}</td>
-                        <td>{entry.emergency ? "Yes" : "No"}</td>
+                        <td>
+                          {entry.type === "OD"
+                            ? entry.odLocation || "Not Specified"
+                            : "—"}
+                        </td>
                         <td>
                           <Button
                             color="warning"
@@ -811,24 +822,33 @@ const LeaveManagement = () => {
               </FormGroup>
             </Col>
           </Row>
-          <Row>
-            <Col md={6}>
-              <FormGroup>
-                <Label>Emergency?</Label>
-                <div>
-                  <Switch
-                    uncheckedIcon={<OffSymbol />}
-                    checkedIcon={<OnSymbol />}
-                    onColor="#02a499"
-                    onChange={(checked) =>
-                      handleEditChange("emergency", checked)
+          {editFormData.type === "OD" && (
+            <Row>
+              <Col md={12}>
+                <FormGroup>
+                  <Label>
+                    OD Location <span className="text-danger">*</span>
+                  </Label>
+                  <Input
+                    type="text"
+                    value={editFormData.odLocation || ""}
+                    onChange={(e) =>
+                      handleEditChange("odLocation", e.target.value)
                     }
-                    checked={editFormData.emergency}
+                    placeholder="Enter OD work location"
+                    maxLength="120"
+                    invalid={
+                      editFormData.type === "OD" &&
+                      (editFormData.odLocation || "").trim() === ""
+                    }
                   />
-                </div>
-              </FormGroup>
-            </Col>
-          </Row>
+                  <div className="invalid-feedback">
+                    Please enter OD location
+                  </div>
+                </FormGroup>
+              </Col>
+            </Row>
+          )}
           <FormGroup>
             <Label>Reason</Label>
             <Input

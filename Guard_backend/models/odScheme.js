@@ -28,6 +28,13 @@ const od_scheme = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // Actual location where the OD is performed (replaces the old emergency
+    // flag). Older records are backfilled with "Not Specified".
+    odLocation: {
+      type: String,
+      required: true,
+      default: "Not Specified",
+    },
   },
   { versionKey: false, timestamps: true } // ignore __v id
 );

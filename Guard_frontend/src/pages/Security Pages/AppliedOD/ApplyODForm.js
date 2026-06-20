@@ -32,7 +32,7 @@ const ApplyODForm = () => {
     toDate: "",
     reason: "",
     reasonCount: 0,
-    emergency: false,
+    location: "",
   });
 
   const [searchTerm, setSearchTerm] = useState("");
@@ -47,6 +47,7 @@ const ApplyODForm = () => {
     odType: null,
     fromDate: null,
     toDate: null,
+    location: null,
     reason: null,
   });
 
@@ -218,6 +219,7 @@ const ApplyODForm = () => {
       toDate:
         formData.toDate !== "" &&
         new Date(formData.toDate) >= new Date(formData.fromDate),
+      location: formData.location.trim() !== "",
       reason: formData.reason.trim().length >= 10,
     };
 
@@ -245,6 +247,7 @@ const ApplyODForm = () => {
       empFromDate: formData.fromDate.toISOString().split("T")[0],
       empToDate: formData.toDate.toISOString().split("T")[0],
       empPurpose: formData.reason,
+      odLocation: formData.location.trim(),
     };
 
     try {
@@ -269,7 +272,7 @@ const ApplyODForm = () => {
         toDate: "",
         reason: "",
         reasonCount: 0,
-        emergency: false,
+        location: "",
       });
       setSelectedEmployee(null);
       setSearchTerm("");
@@ -542,25 +545,27 @@ const ApplyODForm = () => {
                   </FormGroup>
                 </Col>
               </Row>
-              <Row>
-                <Col md={6}>
-                  <FormGroup>
-                    <Label>Emergency OD?</Label>
-                    <div>
-                      <Switch
-                        uncheckedIcon={<Offsymbol />}
-                        checkedIcon={<OnSymbol />}
-                        onColor="#02a499"
-                        onChange={() =>
-                          handleChange("emergency", !formData.emergency)
-                        }
-                        checked={formData.emergency}
-                        disabled={submitting}
-                      />
-                    </div>
-                  </FormGroup>
-                </Col>
-              </Row>
+              <FormGroup>
+                <Label>
+                  OD Location <span className="text-danger">*</span>
+                </Label>
+                <input
+                  type="text"
+                  className={`form-control ${
+                    isValid.location === false ? "is-invalid" : ""
+                  }`}
+                  value={formData.location}
+                  onChange={(e) => handleChange("location", e.target.value)}
+                  placeholder="Enter OD work location (e.g. Main Gate, Admin Building)"
+                  maxLength="120"
+                  disabled={submitting}
+                />
+                {isValid.location === false && (
+                  <div className="invalid-feedback">
+                    Please enter OD location
+                  </div>
+                )}
+              </FormGroup>
               <FormGroup>
                 <Label>Reason</Label>
                 <textarea
