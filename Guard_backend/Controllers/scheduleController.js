@@ -10,9 +10,14 @@ require("dotenv").config();
 const { MongoClient } = require("mongodb");
 // const { totalmem } = require("os");
 
-const MDB_URl1 = process.env.MONGO_URI1;
-// console.log("MDB_URl1 : ", MDB_URl1);
-const client = new MongoClient(MDB_URl1);
+const mongoUri = process.env.MONGO_URI || process.env.MONGO_URI1;
+if (!mongoUri) {
+  throw new Error(
+    "Missing MongoDB connection string. Set MONGO_URI in Guard_backend/.env or environment variables."
+  );
+}
+
+const client = new MongoClient(mongoUri);
 
 
 function buildDateTime(dateStr, timeStr) {
