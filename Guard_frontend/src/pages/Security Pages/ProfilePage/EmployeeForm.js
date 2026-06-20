@@ -36,6 +36,9 @@ const EmployeeForm = () => {
     epfNo: "",
     esiNo: "",
     address: "",
+    emergencyContactName: "",
+    emergencyContactNumber: "",
+    emergencyContactRelation: "",
     empImage: null,
   });
   const [imagePreview, setImagePreview] = useState(null);
@@ -118,6 +121,9 @@ const EmployeeForm = () => {
             epfNo: emp.epfNo || "",
             esiNo: emp.esiNo || "",
             address: emp.address || "",
+            emergencyContactName: emp.emergencyContactName || "",
+            emergencyContactNumber: emp.emergencyContactNumber || "",
+            emergencyContactRelation: emp.emergencyContactRelation || "",
             empImage: null,
           });
 
@@ -213,6 +219,9 @@ const EmployeeForm = () => {
       epfNo: "",
       esiNo: "",
       address: "",
+      emergencyContactName: "",
+      emergencyContactNumber: "",
+      emergencyContactRelation: "",
       empImage: null,
     });
     setImagePreview(null);
@@ -794,6 +803,69 @@ const EmployeeForm = () => {
                         }}
                       />
                     </FormGroup>
+                  </Col>
+                </Row>
+                <h6 className="mt-2 mb-2 text-muted">Emergency Contact</h6>
+                <Row>
+                  <Col md={4}>
+                    <AvField
+                      className="mb-3"
+                      name="emergencyContactName"
+                      label="Emergency Contact Name"
+                      placeholder="Enter contact name"
+                      type="text"
+                      value={formData.emergencyContactName}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          emergencyContactName: e.target.value,
+                        })
+                      }
+                      validate={{ required: { value: false } }}
+                      disabled={submitting}
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <AvField
+                      className="mb-3"
+                      name="emergencyContactNumber"
+                      label="Emergency Contact Number"
+                      placeholder="Enter contact number"
+                      type="text"
+                      value={formData.emergencyContactNumber}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          emergencyContactNumber: e.target.value,
+                        })
+                      }
+                      validate={{
+                        required: { value: false },
+                        pattern: {
+                          value: "^[0-9]{10}$",
+                          errorMessage: "Enter valid 10-digit number",
+                        },
+                      }}
+                      disabled={submitting}
+                    />
+                  </Col>
+                  <Col md={4}>
+                    <AvField
+                      className="mb-3"
+                      name="emergencyContactRelation"
+                      label="Relation"
+                      placeholder="e.g. Father, Spouse, Brother"
+                      type="text"
+                      value={formData.emergencyContactRelation}
+                      onChange={(e) =>
+                        setFormData({
+                          ...formData,
+                          emergencyContactRelation: e.target.value,
+                        })
+                      }
+                      validate={{ required: { value: false } }}
+                      disabled={submitting}
+                    />
                   </Col>
                 </Row>
                 <AvField
