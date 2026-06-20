@@ -18,7 +18,9 @@ import { ToastContainer, toast } from "react-toastify";
 import "react-toastify/dist/ReactToastify.css";
 import styled from "styled-components";
 import Loader from "components/Loader";
+import { useNavigate } from "react-router-dom";
 import { getEmpImageUrl, handleEmpImageError } from "helpers/empImage";
+import { friendlyApiError } from "helpers/apiError";
 
 // Base URL for API endpoints
 const BASE_URL = process.env.REACT_APP_API_BASE_URL;
@@ -55,6 +57,7 @@ const ApplyODForm = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [submitting, setSubmitting] = useState(false);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const controller = new AbortController();
@@ -252,7 +255,9 @@ const ApplyODForm = () => {
 
     try {
       setSubmitting(true);
-      const response = await axios.post(`${BASE_URL}/od/apply-od`, payload);
+      const response = await axios.post(`${BASE_URL}/od/apply-od`, payload, {
+        timeout: 15000,
+      });
       console.log("Server response:", response.data);
 
       toast.success("OD applied successfully!", {
@@ -276,11 +281,11 @@ const ApplyODForm = () => {
       });
       setSelectedEmployee(null);
       setSearchTerm("");
+      // Take the user to the records list so they can see the new entry.
+      setTimeout(() => navigate("/LeaveOdManagement"), 1200);
     } catch (error) {
       console.error("Error submitting OD:", error);
-      const errorMessage =
-        error.response?.data?.message || error.message || "Failed to apply OD";
-      toast.error(`Error: ${errorMessage}`, {
+      toast.error(friendlyApiError(error, { fallback: "Failed to apply OD" }), {
         position: "top-right",
         autoClose: 5000,
       });
