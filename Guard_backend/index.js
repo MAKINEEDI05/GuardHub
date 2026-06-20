@@ -4,6 +4,7 @@ const mongoose = require("mongoose");
 const leaveRoutes = require("./Routers/leaveRoutes");
 const odRoutes = require("./Routers/odRoutes");
 const rosterRoutes = require("./Routers/rosterRoutes");
+const otRoutes = require("./Routers/otRoutes");
 const attendanceRouter = require("./Routers/empAttendanceRoutes");
 const profile = require("./Routers/profileRouters");
 const monthLeaves = require("./Routers/monthWiseReportRoutes");
@@ -39,6 +40,7 @@ app.use("/emp", profile);
 app.use("/leave", leaveRoutes);
 app.use("/od", odRoutes);
 app.use("/roster", rosterRoutes);
+app.use("/ot", otRoutes);
 app.use("/attendance", attendanceRouter);
 app.use("/month", monthLeaves);
 
