@@ -34,6 +34,17 @@ export function useAddEmployee() {
   });
 }
 
+// Bulk upsert a batch of employee rows. The bulk-upload drawer chunks a CSV
+// for progress; each chunk is one mutation. Invalidates the list on success.
+export function useBulkUploadEmployees() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (rows) => employeeService.bulkUpload(rows),
+    onSuccess: () => qc.invalidateQueries({ queryKey: QK.employees }),
+    onError: (e) => toast.error(e.friendlyMessage || "Bulk upload failed."),
+  });
+}
+
 export function useUpdateEmployee() {
   const qc = useQueryClient();
   return useMutation({

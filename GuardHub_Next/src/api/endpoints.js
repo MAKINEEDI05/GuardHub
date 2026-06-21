@@ -9,6 +9,7 @@ export const ENDPOINTS = {
   employees: "/emp/get-emp-details",
   employeeById: (empId) => `/emp/get-emp-byid/${empId}`,
   addEmployee: "/emp/add-employee", // multipart, field: empImage
+  bulkUploadEmployees: "/emp/bulk-upload", // JSON { rows: [...] }, upsert by empId
   updateEmployee: (empId) => `/emp/update-emp-byid/${empId}`,
   deleteEmployee: (empId) => `/emp/delete-emp-byid/${empId}`,
   empImageBase: "/emp/uploads",

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useMemo, useState } from "react";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
 import SearchBar from "../components/ui/SearchBar";
@@ -8,11 +8,10 @@ import Icon from "../components/ui/Icon";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import EmployeeFormDrawer from "../components/employees/EmployeeFormDrawer";
 import EmployeeViewModal from "../components/employees/EmployeeViewModal";
+import EmployeeBulkUploadDrawer from "../components/employees/EmployeeBulkUploadDrawer";
 import { Select } from "../components/ui/Field";
 import { useEmployees, useDeleteEmployee } from "../hooks/useEmployees";
-import { employeeService } from "../services/employeeService";
-import { toast } from "../store/toastStore";
-import { downloadCsv, downloadTemplate, parseCsvFile } from "../utils/csv";
+import { downloadCsv, downloadTemplate } from "../utils/csv";
 import { DESIGNATIONS, DEPARTMENTS } from "../utils/constants";
 
 // CSV columns for export + bulk-upload template. Mirrors the legacy app so
@@ -37,9 +36,8 @@ const CSV_COLUMNS = [
 ];
 
 export default function Employees() {
-  const { data: employees = [], isLoading, refetch } = useEmployees();
+  const { data: employees = [], isLoading } = useEmployees();
   const del = useDeleteEmployee();
-  const fileRef = useRef(null);
 
   const [term, setTerm] = useState("");
   const [desigFilter, setDesigFilter] = useState("");
@@ -47,7 +45,7 @@ export default function Employees() {
   const [drawer, setDrawer] = useState({ open: false, employee: null });
   const [viewing, setViewing] = useState(null);
   const [confirm, setConfirm] = useState(null);
-  const [importing, setImporting] = useState(false);
+  const [bulkOpen, setBulkOpen] = useState(false);
 
   const filtered = useMemo(() => {
     const q = term.trim().toLowerCase();
@@ -62,43 +60,6 @@ export default function Employees() {
       return true;
     });
   }, [employees, term, desigFilter, deptFilter]);
-
-  const onImport = async (e) => {
-    const file = e.target.files?.[0];
-    e.target.value = "";
-    if (!file) return;
-    setImporting(true);
-    try {
-      const { rows } = await parseCsvFile(file);
-      const valid = rows.filter((r) => String(r.empId || "").trim() && String(r.empName || "").trim());
-      if (valid.length === 0) {
-        toast.warning("No rows with both empId and empName found.");
-        return;
-      }
-      // The backend has no bulk employee endpoint, so add row-by-row. Failures
-      // (e.g. duplicate id) are counted, not fatal.
-      let ok = 0;
-      let fail = 0;
-      for (const row of valid) {
-        const values = Object.fromEntries(
-          Object.entries(row).filter(([, v]) => v !== "" && v != null)
-        );
-        try {
-          // eslint-disable-next-line no-await-in-loop
-          await employeeService.add(values, null);
-          ok += 1;
-        } catch {
-          fail += 1;
-        }
-      }
-      toast.success(`Imported ${ok} employee(s)${fail ? `, ${fail} failed` : ""}.`);
-      refetch();
-    } catch {
-      toast.error("Could not read the CSV file.");
-    } finally {
-      setImporting(false);
-    }
-  };
 
   const columns = [
     {
@@ -170,10 +131,9 @@ export default function Employees() {
             <Button variant="outline" onClick={() => downloadCsv("employees.csv", CSV_COLUMNS, employees)}>
               <Icon name="download" size={16} /> Export CSV
             </Button>
-            <Button variant="outline" loading={importing} onClick={() => fileRef.current?.click()}>
+            <Button variant="outline" onClick={() => setBulkOpen(true)}>
               <Icon name="upload" size={16} /> Bulk Upload
             </Button>
-            <input ref={fileRef} type="file" accept=".csv" hidden onChange={onImport} />
             <Button onClick={() => setDrawer({ open: true, employee: null })}>
               <Icon name="plus" size={16} /> Add Employee
             </Button>
@@ -223,6 +183,8 @@ export default function Employees() {
         employee={drawer.employee}
         onClose={() => setDrawer({ open: false, employee: null })}
       />
+
+      <EmployeeBulkUploadDrawer open={bulkOpen} onClose={() => setBulkOpen(false)} />
 
       <ConfirmDialog
         open={!!confirm}

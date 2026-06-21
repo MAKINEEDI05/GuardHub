@@ -33,6 +33,16 @@ export const employeeService = {
     return data;
   },
 
+  // Bulk add/update employees. The backend upserts on empId (exists -> update,
+  // else create) and returns { totalRows, added, updated, skipped, failed,
+  // invalidRecords, duplicateRecords, failedRecords }.
+  async bulkUpload(rows) {
+    const { data } = await apiClient.post(ENDPOINTS.bulkUploadEmployees, {
+      rows,
+    });
+    return data;
+  },
+
   async update(empId, values, imageFile) {
     const { data } = await apiClient.put(
       ENDPOINTS.updateEmployee(empId),
