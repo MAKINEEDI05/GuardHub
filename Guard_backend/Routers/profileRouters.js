@@ -6,6 +6,7 @@ const {
   getEmpById,
   deleteEmpById,
   updateEmp,
+  bulkUpsertEmployees,
 } = require("../Controllers/profileController");
 
 const multer = require("multer");
@@ -47,6 +48,7 @@ const upload = multer({
 // Routes
 router.get("/get-emp-details", getAllEmpData);
 router.post("/add-employee", upload.single("empImage"), addEmpData);
+router.post("/bulk-upload", bulkUpsertEmployees);
 router.get("/get-emp-byid/:empId", getEmpById);
 router.put("/update-emp-byid/:empId", upload.single("empImage"), updateEmp);
 router.delete("/delete-emp-byid/:empId", deleteEmpById);
