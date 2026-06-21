@@ -1,0 +1,87 @@
+/* GuardHub design tokens. Brand: Deep Security Green / Operational Orange /
+   Accent Gold / Dark Navy. Light + dark themes via [data-theme]. */
+
+:root {
+  /* Brand */
+  --brand-green: #065229;
+  --brand-green-600: #054721;
+  --brand-green-700: #043a1b;
+  --brand-orange: #d06c38;
+  --brand-gold: #be9338;
+  --brand-navy: #0d2338;
+
+  /* Status colors */
+  --status-present: #065229;
+  --status-leave: #d06c38;
+  --status-od: #be9338;
+  --status-ot: #3b82f6;
+  --status-absent: #dc2626;
+  --status-weekoff: #64748b;
+
+  /* Typography */
+  --font-sans: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --fs-page: 1.375rem;
+  --fs-section: 1.05rem;
+  --fs-card-title: 0.95rem;
+  --fs-body: 0.875rem;
+  --fs-table: 0.8125rem;
+  --fs-small: 0.75rem;
+
+  /* Spacing / radius */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-5: 24px;
+  --sp-6: 32px;
+  --radius-sm: 6px;
+  --radius: 10px;
+  --radius-lg: 14px;
+
+  /* Layout */
+  --sidebar-w: 240px;
+  --sidebar-w-collapsed: 72px;
+  --topbar-h: 60px;
+
+  --shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.06);
+  --shadow: 0 2px 8px rgba(15, 23, 42, 0.08);
+  --shadow-lg: 0 8px 30px rgba(15, 23, 42, 0.16);
+
+  --transition: 140ms ease;
+}
+
+/* Light theme (default) */
+[data-theme="light"] {
+  --bg: #f8fafc;
+  --surface: #ffffff;
+  --surface-2: #f1f5f9;
+  --sidebar-bg: #0d2338;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-active: #ffffff;
+  --text: #1e293b;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --input-bg: #ffffff;
+  --primary: var(--brand-green);
+  --primary-contrast: #ffffff;
+  --hover: #f1f5f9;
+  --row-hover: #f8fafc;
+}
+
+/* Dark theme */
+[data-theme="dark"] {
+  --bg: #0f172a;
+  --surface: #1e293b;
+  --surface-2: #243044;
+  --sidebar-bg: #0d2338;
+  --sidebar-text: #cbd5e1;
+  --sidebar-text-active: #ffffff;
+  --text: #f8fafc;
+  --text-muted: #cbd5e1;
+  --border: #334155;
+  --input-bg: #0f172a;
+  --primary: #0a7a3d;
+  --primary-contrast: #ffffff;
+  --hover: #243044;
+  --row-hover: #243044;
+}
