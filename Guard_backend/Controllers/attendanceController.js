@@ -22,6 +22,21 @@ const fmtTime = (d) => {
   return `${p(x.getUTCHours())}:${p(x.getUTCMinutes())}:${p(x.getUTCSeconds())}`;
 };
 
+// Attendance only exists up to today; reject future dates everywhere. Keep this
+// wording in sync with the frontend (GuardHub_Next utils/date.js).
+const FUTURE_DATE_MESSAGE = "Attendance data is not available for future dates.";
+
+// True when `day` (a Date at UTC midnight) is after the current UTC day.
+const isFutureUtcDay = (day) => {
+  const now = new Date();
+  const todayMid = Date.UTC(
+    now.getUTCFullYear(),
+    now.getUTCMonth(),
+    now.getUTCDate()
+  );
+  return day.getTime() > todayMid;
+};
+
 // const todayAttendanceData = async (req, res) => {
 //   try {
 //     const empData = await axios.get(
@@ -253,6 +268,9 @@ const getAttendanceByDate = async (req, res) => {
       return res
         .status(400)
         .json({ message: "Invalid date format (expected yyyy-mm-dd)" });
+    }
+    if (isFutureUtcDay(startOfDay)) {
+      return res.status(400).json({ message: FUTURE_DATE_MESSAGE });
     }
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 

@@ -15,12 +15,31 @@ export function todayYmd() {
   return toYmd(new Date());
 }
 
-// First and last day of the current month as yyyy-mm-dd.
+// Shared message for any attendance screen that is asked for a future date.
+// Keep this in sync with the backend (Guard_backend uses the same wording).
+export const FUTURE_DATE_MESSAGE =
+  "Attendance data is not available for future dates.";
+
+// True when `value` (a yyyy-mm-dd string or Date) is strictly after today.
+// Attendance only exists up to and including today, so future dates are invalid.
+export function isFutureYmd(value) {
+  const ymd = typeof value === "string" ? value : toYmd(value);
+  if (!ymd) return false;
+  return ymd > todayYmd();
+}
+
+// Never let a yyyy-mm-dd value point past today.
+export function clampToToday(value) {
+  return isFutureYmd(value) ? todayYmd() : value;
+}
+
+// Current month range as yyyy-mm-dd, with the end clamped to today so the
+// default never selects future dates (attendance has no data for them).
 export function currentMonthRange() {
   const now = new Date();
   const start = new Date(now.getFullYear(), now.getMonth(), 1);
   const end = new Date(now.getFullYear(), now.getMonth() + 1, 0);
-  return { start: toYmd(start), end: toYmd(end) };
+  return { start: toYmd(start), end: clampToToday(toYmd(end)) };
 }
 
 // Human-friendly date for tables, e.g. "12 Jun 2026". Accepts ISO strings.

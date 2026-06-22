@@ -35,4 +35,5 @@ export const QK = {
   ot: ["ot"],
   attendanceByDate: (date) => ["attendance", date],
   monthwise: (id, from, to) => ["monthwise", String(id), from, to],
+  monthwiseSummary: (from, to) => ["monthwise-summary", from, to],
 };

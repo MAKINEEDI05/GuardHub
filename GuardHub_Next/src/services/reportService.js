@@ -12,4 +12,21 @@ export const reportService = {
     });
     return data?.summary || null;
   },
+
+  // All-employees summary over a date range, computed server-side in one call.
+  // Returns { data: rows[], totals, total, startDate, endDate, totalDays }.
+  // The page fetches the full filtered set and paginates client-side (the
+  // dataset is small), so page/limit are left to the backend default (all).
+  async monthwiseSummary(startDate, endDate) {
+    const { data } = await apiClient.get(ENDPOINTS.monthwiseSummary, {
+      params: { startDate, endDate },
+    });
+    return {
+      rows: Array.isArray(data?.data) ? data.data : [],
+      totals: data?.totals || null,
+      totalDays: data?.totalDays ?? 0,
+      startDate: data?.startDate,
+      endDate: data?.endDate,
+    };
+  },
 };

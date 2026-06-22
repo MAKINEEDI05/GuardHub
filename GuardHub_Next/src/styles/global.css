@@ -789,3 +789,23 @@ h1, h2, h3, h4, h5 {
   .dw-toolbar__action { width: 100%; margin-left: 0; }
   .dw-toolbar__action .btn { width: 100%; justify-content: center; }
 }
+
+/* Month Wise toolbar: search grows, two date fields + export sit beside it,
+   and everything stacks full-width on small screens. */
+.mw-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.mw-toolbar .field__label { display: block; margin-bottom: 4px; }
+.mw-toolbar__search { flex: 1 1 260px; min-width: 200px; }
+.mw-toolbar__date { width: 170px; }
+.mw-toolbar__action { margin-left: auto; }
+@media (max-width: 760px) {
+  .mw-toolbar { align-items: stretch; }
+  .mw-toolbar__search,
+  .mw-toolbar__date,
+  .mw-toolbar__action { width: 100%; margin-left: 0; }
+  .mw-toolbar__action .btn { width: 100%; justify-content: center; }
+}
