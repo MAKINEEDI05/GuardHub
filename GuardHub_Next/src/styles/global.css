@@ -770,3 +770,22 @@ h1, h2, h3, h4, h5 {
 @media (max-width: 640px) {
   .pagination { justify-content: center; }
 }
+
+/* ---- Day Wise Report toolbar (date + search + export in one row) ---- */
+.dw-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.dw-toolbar .field__label { display: block; margin-bottom: 4px; }
+.dw-toolbar__date { width: 180px; }
+.dw-toolbar__search { flex: 1 1 280px; min-width: 220px; }
+.dw-toolbar__action { margin-left: auto; }
+@media (max-width: 640px) {
+  .dw-toolbar { align-items: stretch; }
+  .dw-toolbar__date,
+  .dw-toolbar__search,
+  .dw-toolbar__action { width: 100%; margin-left: 0; }
+  .dw-toolbar__action .btn { width: 100%; justify-content: center; }
+}

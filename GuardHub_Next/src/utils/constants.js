@@ -86,8 +86,10 @@ export function shiftStatusClass(value) {
   const v = String(value || "").toLowerCase();
   if (v.includes("week") && v.includes("off")) return "status--weekoff";
   if (v.includes("present")) return "status--present";
+  if (v.includes("late")) return "status--leave"; // warning tone
   if (v.includes("leave")) return "status--leave";
   if (v.includes("absent")) return "status--absent";
+  if (v === "ot" || v.includes("overtime")) return "status--ot";
   if (v.includes("od")) return "status--od";
   return "status--neutral";
 }

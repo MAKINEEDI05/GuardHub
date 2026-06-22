@@ -12,6 +12,7 @@ export default function DataTable({
   loading,
   rowKey = (r, i) => r._id || r.empId || i,
   pageSize = 12,
+  pageSizeOptions, // e.g. [20, 50, 100] -> shows a "Rows per page" selector
   paginate = true,
   emptyTitle = "No records found",
   emptyMessage,
@@ -20,6 +21,8 @@ export default function DataTable({
 }) {
   const [sort, setSort] = useState({ key: null, dir: "asc" });
   const [page, setPage] = useState(1);
+  const [size, setSize] = useState(pageSize);
+  const effectiveSize = pageSizeOptions ? size : pageSize;
 
   const sorted = useMemo(() => {
     if (!sort.key) return rows;
@@ -41,10 +44,10 @@ export default function DataTable({
     return copy;
   }, [rows, sort, columns]);
 
-  const totalPages = paginate ? Math.max(1, Math.ceil(sorted.length / pageSize)) : 1;
+  const totalPages = paginate ? Math.max(1, Math.ceil(sorted.length / effectiveSize)) : 1;
   const currentPage = Math.min(page, totalPages);
   const pageRows = paginate
-    ? sorted.slice((currentPage - 1) * pageSize, currentPage * pageSize)
+    ? sorted.slice((currentPage - 1) * effectiveSize, currentPage * effectiveSize)
     : sorted;
 
   const toggleSort = (key) => {
@@ -65,6 +68,7 @@ export default function DataTable({
                 <th
                   key={c.key}
                   className={`${c.className || ""} ${c.sortable ? "sortable" : ""}`}
+                  style={c.width ? { width: c.width } : undefined}
                   onClick={c.sortable ? () => toggleSort(c.key) : undefined}
                 >
                   {c.header}
@@ -97,33 +101,51 @@ export default function DataTable({
         <EmptyState title={emptyTitle} message={emptyMessage} icon={emptyIcon} />
       )}
 
-      {!loading && paginate && sorted.length > pageSize && (
-        <div className="pagination">
-          <span>
-            {(currentPage - 1) * pageSize + 1}–
-            {Math.min(currentPage * pageSize, sorted.length)} of {sorted.length}
-          </span>
-          <div className="pagination__pages">
-            <button
-              className="btn btn--outline btn--sm"
-              disabled={currentPage === 1}
-              onClick={() => setPage(currentPage - 1)}
-            >
-              Prev
-            </button>
-            <span className="nowrap">
-              Page {currentPage} / {totalPages}
+      {!loading &&
+        paginate &&
+        sorted.length > 0 &&
+        (pageSizeOptions || sorted.length > effectiveSize) && (
+          <div className="pagination">
+            <span className="muted text-sm">
+              {(currentPage - 1) * effectiveSize + 1}–
+              {Math.min(currentPage * effectiveSize, sorted.length)} of {sorted.length}
             </span>
-            <button
-              className="btn btn--outline btn--sm"
-              disabled={currentPage === totalPages}
-              onClick={() => setPage(currentPage + 1)}
-            >
-              Next
-            </button>
+            <div className="pagination__pages">
+              {pageSizeOptions && (
+                <label className="text-sm muted" style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                  Rows
+                  <select
+                    className="select"
+                    value={size}
+                    onChange={(e) => { setSize(Number(e.target.value)); setPage(1); }}
+                    style={{ width: "auto" }}
+                  >
+                    {pageSizeOptions.map((n) => (
+                      <option key={n} value={n}>{n}</option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              <button
+                className="btn btn--outline btn--sm"
+                disabled={currentPage === 1}
+                onClick={() => setPage(currentPage - 1)}
+              >
+                Prev
+              </button>
+              <span className="nowrap text-sm">
+                Page {currentPage} / {totalPages}
+              </span>
+              <button
+                className="btn btn--outline btn--sm"
+                disabled={currentPage === totalPages}
+                onClick={() => setPage(currentPage + 1)}
+              >
+                Next
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        )}
     </div>
   );
 }
