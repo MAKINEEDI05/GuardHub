@@ -3,4 +3,7 @@ dist
 dist-ssr
 *.local
 .DS_Store
-.env.production
+# Environment files (keep .env.example tracked)
+.env
+.env.*
+!.env.example
