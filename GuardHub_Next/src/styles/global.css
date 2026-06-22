@@ -738,3 +738,35 @@ h1, h2, h3, h4, h5 {
   .hamburger { display: inline-flex; }
   .app-content { padding: var(--sp-4); }
 }
+
+/* ---- Pagination footer (server-side paginated tables) ---- */
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: var(--sp-3);
+  padding: var(--sp-3) var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+.pagination__controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-4);
+  flex-wrap: wrap;
+}
+.pagination__size {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.pagination__nav {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+}
+.pagination__page { white-space: nowrap; }
+.pagination .btn { display: inline-flex; align-items: center; gap: 4px; }
+@media (max-width: 640px) {
+  .pagination { justify-content: center; }
+}

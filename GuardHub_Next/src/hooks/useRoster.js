@@ -1,10 +1,26 @@
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  useQuery,
+  useMutation,
+  useQueryClient,
+  keepPreviousData,
+} from "@tanstack/react-query";
 import { rosterService } from "../services/rosterService";
 import { QK } from "../api/queryClient";
 import { toast } from "../store/toastStore";
 
 export function useRosters() {
   return useQuery({ queryKey: QK.rosters, queryFn: rosterService.list });
+}
+
+// Server-side paginated roster list. `params` = { page, limit, search, shift,
+// department }. keepPreviousData keeps the current page visible (no flash)
+// while the next page loads.
+export function useRostersPaged(params) {
+  return useQuery({
+    queryKey: QK.rostersPaged(params),
+    queryFn: () => rosterService.listPaged(params),
+    placeholderData: keepPreviousData,
+  });
 }
 
 export function useAddRoster() {

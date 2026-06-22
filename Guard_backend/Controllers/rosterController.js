@@ -64,13 +64,79 @@ const updateRoster = async (req, res) => {
   }
 };
 
-// Get all od records
+// Get roster records, with optional server-side pagination + filtering.
+// - No `page`/`limit` query params  -> returns the full array (legacy/back-compat
+//   behaviour used by exports and older consumers).
+// - With `page`/`limit`             -> returns { records, totalRecords,
+//   totalPages, currentPage }.
+// Filters (apply in both modes): search (empName/empId/designation/department/
+// mobileNo), department (exact), shift (any weekday equals the value).
+const WEEK_DAYS = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+];
+
 const getAllgurds = async (req, res) => {
   try {
-    const gurds = await roster.find();
-    res.json(gurds);
+    const { page, limit, search, shift, department } = req.query;
+
+    const filter = {};
+    const andClauses = [];
+
+    if (search && String(search).trim()) {
+      const escaped = String(search)
+        .trim()
+        .replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const rx = new RegExp(escaped, "i");
+      andClauses.push({
+        $or: [
+          { empName: rx },
+          { empId: rx },
+          { designation: rx },
+          { department: rx },
+          { mobileNo: rx },
+        ],
+      });
+    }
+
+    if (department && String(department).trim()) {
+      filter.department = department;
+    }
+
+    if (shift && String(shift).trim()) {
+      andClauses.push({
+        $or: WEEK_DAYS.map((d) => ({ [`weeklyShifts.${d}`]: shift })),
+      });
+    }
+
+    if (andClauses.length) filter.$and = andClauses;
+
+    // Legacy mode — full array (exports, backward compatibility).
+    if (page === undefined && limit === undefined) {
+      const all = await roster.find(filter).sort({ empName: 1 });
+      return res.json(all);
+    }
+
+    const pageNum = Math.max(1, parseInt(page, 10) || 1);
+    const pageSize = Math.min(500, Math.max(1, parseInt(limit, 10) || 20));
+    const totalRecords = await roster.countDocuments(filter);
+    const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize));
+    const records = await roster
+      .find(filter)
+      .sort({ empName: 1 })
+      .skip((pageNum - 1) * pageSize)
+      .limit(pageSize);
+
+    return res.json({ records, totalRecords, totalPages, currentPage: pageNum });
   } catch (error) {
-    res.status(500).json({ message: "Error fetching leaves", error });
+    res
+      .status(500)
+      .json({ message: "Error fetching roster", error: error.message });
   }
 };
 

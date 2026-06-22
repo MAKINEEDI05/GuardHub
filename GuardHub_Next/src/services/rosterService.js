@@ -11,6 +11,31 @@ export const rosterService = {
     return Array.isArray(data) ? data : [];
   },
 
+  // Server-side paginated + filtered list. Returns
+  // { records, totalRecords, totalPages, currentPage }.
+  async listPaged({ page = 1, limit = 20, search = "", shift = "", department = "" } = {}) {
+    const params = { page, limit };
+    if (search) params.search = search;
+    if (shift) params.shift = shift;
+    if (department) params.department = department;
+    const { data } = await apiClient.get(ENDPOINTS.rosters, { params });
+    // Be tolerant if the backend returns a bare array (legacy).
+    if (Array.isArray(data)) {
+      return {
+        records: data,
+        totalRecords: data.length,
+        totalPages: 1,
+        currentPage: 1,
+      };
+    }
+    return {
+      records: data.records || [],
+      totalRecords: data.totalRecords || 0,
+      totalPages: data.totalPages || 1,
+      currentPage: data.currentPage || page,
+    };
+  },
+
   async byEmp(empId) {
     const { data } = await apiClient.get(ENDPOINTS.rosterByEmp(empId));
     return Array.isArray(data) ? data : [];

@@ -20,6 +20,9 @@ const PATHS = {
   eye: <><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z" /><circle cx="12" cy="12" r="3" /></>,
   edit: <><path d="M12 20h9" /><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" /></>,
   trash: <><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14" /></>,
+  "chevron-left": <><path d="m15 18-6-6 6-6" /></>,
+  "chevron-right": <><path d="m9 18 6-6-6-6" /></>,
+  alert: <><circle cx="12" cy="12" r="9" /><path d="M12 8v4M12 16h.01" /></>,
 };
 
 export default function Icon({ name, size = 18, className = "" }) {
