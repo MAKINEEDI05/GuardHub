@@ -10,7 +10,7 @@ import EmployeeFormDrawer from "../components/employees/EmployeeFormDrawer";
 import EmployeeViewModal from "../components/employees/EmployeeViewModal";
 import EmployeeBulkUploadDrawer from "../components/employees/EmployeeBulkUploadDrawer";
 import { Select } from "../components/ui/Field";
-import { useEmployees, useDeleteEmployee, useEmployeeFilterOptions } from "../hooks/useEmployees";
+import { useEmployees, useDeleteEmployee } from "../hooks/useEmployees";
 import { downloadCsv } from "../utils/csv";
 import { downloadTemplate, EMPLOYEE_TEMPLATE } from "../utils/templates";
 
@@ -37,12 +37,31 @@ const CSV_COLUMNS = [
 
 export default function Employees() {
   const { data: employees = [], isLoading } = useEmployees();
-  // Filter dropdown values are generated live from employee data (no hardcoded
-  // lists) — new designations/departments appear automatically after upload.
-  const { data: filterOptions } = useEmployeeFilterOptions();
-  const designations = filterOptions?.designations ?? [];
-  const departments = filterOptions?.departments ?? [];
   const del = useDeleteEmployee();
+
+  // Filter dropdown values are derived LIVE from the loaded employee list —
+  // distinct, trimmed, case-insensitively de-duplicated and sorted. Done on the
+  // client (the list is already fetched) so it works for existing data with no
+  // extra API call/backend endpoint, and refreshes automatically after add/
+  // edit/bulk upload (useEmployees is invalidated by those mutations).
+  const { designations, departments } = useMemo(() => {
+    const distinct = (vals) => {
+      const byKey = new Map(); // lowercase key -> first-seen display form
+      vals.forEach((v) => {
+        const t = String(v ?? "").trim();
+        if (!t) return;
+        const k = t.toLowerCase();
+        if (!byKey.has(k)) byKey.set(k, t);
+      });
+      return [...byKey.values()].sort((a, b) =>
+        a.localeCompare(b, undefined, { sensitivity: "base" })
+      );
+    };
+    return {
+      designations: distinct(employees.map((e) => e.empDesignation)),
+      departments: distinct(employees.map((e) => e.empDepartment)),
+    };
+  }, [employees]);
 
   const [term, setTerm] = useState("");
   const [desigFilter, setDesigFilter] = useState("");
