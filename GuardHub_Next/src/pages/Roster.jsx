@@ -22,7 +22,7 @@ import {
   rosterShiftClass,
   shiftShort,
 } from "../utils/constants";
-import { formatDate } from "../utils/date";
+import { formatDateLocal } from "../utils/date";
 import { downloadCsv } from "../utils/csv";
 
 const PAGE_SIZES = [20, 50, 100];
@@ -99,8 +99,8 @@ export default function Roster() {
       const rows = all.map((r) => ({
         ...r,
         ...WEEKDAYS.reduce((acc, d) => ({ ...acc, [d]: r.weeklyShifts?.[d] || "" }), {}),
-        from: r.shiftFromDate ? formatDate(r.shiftFromDate) : "",
-        to: r.shiftToDate ? formatDate(r.shiftToDate) : "",
+        from: r.shiftFromDate ? formatDateLocal(r.shiftFromDate) : "",
+        to: r.shiftToDate ? formatDateLocal(r.shiftToDate) : "",
       }));
       downloadCsv("roster.csv", cols, rows);
     } catch {
@@ -194,9 +194,9 @@ export default function Roster() {
                         {r.shiftFromDate || r.shiftToDate ? (
                           <>
                             <div className="detail-label" style={{ textTransform: "none" }}>Effective:</div>
-                            {r.shiftFromDate ? formatDate(r.shiftFromDate) : "—"}
+                            {r.shiftFromDate ? formatDateLocal(r.shiftFromDate) : "—"}
                             {" - "}
-                            {r.shiftToDate ? formatDate(r.shiftToDate) : "—"}
+                            {r.shiftToDate ? formatDateLocal(r.shiftToDate) : "—"}
                           </>
                         ) : (
                           "Permanent Schedule"

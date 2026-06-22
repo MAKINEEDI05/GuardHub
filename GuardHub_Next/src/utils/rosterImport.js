@@ -4,6 +4,7 @@
 // / Skip / Invalid — before any data is committed. The backend remains the
 // authority and re-validates on submit; this is the "explain first" layer.
 import { WEEKDAYS, shiftShort } from "./constants";
+import { isTemplateSampleRow } from "./templates";
 
 // Shift synonyms accepted on upload — must match the backend SHIFT_CANON map.
 const SHIFT_CANON = {
@@ -65,8 +66,12 @@ const isBadDate = (v) =>
 export function analyzeRosterRows(rawRows, empMap, rosterMap) {
   const seen = new Set();
 
-  const analyzed = rawRows.map((raw, i) => {
-    const rowNo = i + 1;
+  // Drop the shipped template example row so an unmodified template upload shows
+  // no rows / errors (matches the backend guard). Original row numbers are kept.
+  const analyzed = rawRows
+    .map((raw, i) => ({ raw, rowNo: i + 1 }))
+    .filter(({ raw }) => !isTemplateSampleRow(raw))
+    .map(({ raw, rowNo }) => {
     const empId = String(raw.empId ?? "").trim();
     const emp = empMap.get(empId);
     const existing = rosterMap.get(empId);

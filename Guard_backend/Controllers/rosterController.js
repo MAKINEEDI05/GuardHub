@@ -312,6 +312,10 @@ const bulkUpsertRoster = async (req, res) => {
       const resolvedName =
         (row.empName && String(row.empName).trim()) || (emp && emp.empName) || "";
 
+      // Silently ignore the shipped template example row so an unmodified
+      // template upload never produces validation errors.
+      if (empIdStr === "123" && resolvedName.toLowerCase() === "user testing") return;
+
       // In-file duplicate empId: keep the first row, skip the rest (req: skipped).
       if (empIdStr && seen.has(empIdStr)) {
         flag({

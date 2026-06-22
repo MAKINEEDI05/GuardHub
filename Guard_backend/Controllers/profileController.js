@@ -339,6 +339,10 @@ const bulkUpsertEmployees = async (req, res) => {
       const empName = String(row.empName == null ? "" : row.empName).trim();
       const errors = [];
 
+      // Silently ignore the shipped template example row so an unmodified
+      // template upload never produces validation errors.
+      if (empIdStr === "123" && empName.toLowerCase() === "user testing") return;
+
       if (!empIdStr) errors.push("Employee ID missing");
       else if (!/^[0-9]+$/.test(empIdStr)) errors.push("Invalid Employee ID");
       if (!empName) errors.push("Employee Name missing");

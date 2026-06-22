@@ -55,6 +55,24 @@ export function formatDate(value) {
   });
 }
 
+// Like formatDate but using the LOCAL calendar day (no forced UTC), so it
+// matches the value the date-picker shows via toYmd(). Use this for dates that
+// were stored as local-midnight timestamps (e.g. roster effective dates parsed
+// from a CSV by the server's `new Date(...)`): formatting those in UTC renders
+// the previous day for any timezone ahead of UTC, which made the roster table
+// disagree with the Edit modal. Building from the same local components keeps
+// every surface consistent.
+export function formatDateLocal(value) {
+  if (!value) return "—";
+  const d = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-GB", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
+}
+
 // Relative-ish timestamp for activity feeds, e.g. "12 Jun, 14:30".
 export function formatDateTime(value) {
   if (!value) return "—";

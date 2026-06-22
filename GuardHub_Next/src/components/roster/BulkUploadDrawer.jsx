@@ -6,7 +6,8 @@ import { EmptyState } from "../ui/States";
 import { useBulkUploadRoster, useRosters } from "../../hooks/useRoster";
 import { useEmployees } from "../../hooks/useEmployees";
 import { useAuthStore } from "../../store/authStore";
-import { downloadTemplate, downloadCsv } from "../../utils/csv";
+import { downloadCsv } from "../../utils/csv";
+import { downloadTemplate, ROSTER_TEMPLATE } from "../../utils/templates";
 import {
   parseSpreadsheetFile,
   missingRequiredColumns,
@@ -25,13 +26,8 @@ import { toast } from "../../store/toastStore";
 // as four plain sections — Instructions, Template, File Selection, Validation —
 // so a first-time user sees what to upload, what's required, what's wrong, and
 // exactly what will be created/updated before clicking Upload. The backend
-// re-validates and is the authority.
-const TEMPLATE_HEADERS = [
-  "empId",
-  "empName",
-  "monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday",
-  "fromDate", "toDate",
-];
+// re-validates and is the authority. The downloadable template (with a sample
+// row + Instructions sheet) lives in utils/templates.js.
 
 // A couple of filled-in rows so users can see what "good" data looks like
 // without downloading anything.
@@ -250,7 +246,7 @@ export default function BulkUploadDrawer({ open, onClose }) {
           showSample={showSample}
           onToggleSample={() => setShowSample((v) => !v)}
           onChoose={() => fileRef.current?.click()}
-          onTemplate={() => downloadTemplate("roster-template.csv", TEMPLATE_HEADERS)}
+          onTemplate={() => downloadTemplate(ROSTER_TEMPLATE)}
         />
       )}
 

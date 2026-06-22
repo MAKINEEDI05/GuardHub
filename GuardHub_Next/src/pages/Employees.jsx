@@ -11,7 +11,8 @@ import EmployeeViewModal from "../components/employees/EmployeeViewModal";
 import EmployeeBulkUploadDrawer from "../components/employees/EmployeeBulkUploadDrawer";
 import { Select } from "../components/ui/Field";
 import { useEmployees, useDeleteEmployee, useEmployeeFilterOptions } from "../hooks/useEmployees";
-import { downloadCsv, downloadTemplate } from "../utils/csv";
+import { downloadCsv } from "../utils/csv";
+import { downloadTemplate, EMPLOYEE_TEMPLATE } from "../utils/templates";
 
 // CSV columns for export + bulk-upload template. Mirrors the legacy app so
 // existing spreadsheets keep working.
@@ -129,7 +130,7 @@ export default function Employees() {
         subtitle={`${employees.length} employees`}
         actions={
           <>
-            <Button variant="outline" onClick={() => downloadTemplate("employee-template.csv", CSV_COLUMNS.map((c) => c.label))}>
+            <Button variant="outline" onClick={() => downloadTemplate(EMPLOYEE_TEMPLATE)}>
               <Icon name="download" size={16} /> Template
             </Button>
             <Button variant="outline" onClick={() => downloadCsv("employees.csv", CSV_COLUMNS, employees)}>

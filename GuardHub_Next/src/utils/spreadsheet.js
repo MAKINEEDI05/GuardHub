@@ -27,6 +27,47 @@ export function parseSpreadsheetFile(file) {
   return parseCsvFile(file);
 }
 
+// Build and download an .xlsx template with TWO sheets:
+//   1. the data sheet  — header row + one realistic example row
+//   2. "Instructions"  — plain-text rules so users don't need separate docs
+// The example row carries a cell note; a light-gray/italic style is applied
+// best-effort (the community SheetJS build may not render cell styles, but the
+// example row, the note and the Instructions sheet always work).
+export async function downloadXlsxTemplate({
+  filename,
+  sheetName = "Template",
+  headers,
+  sampleRow,
+  note,
+  instructions = [],
+}) {
+  const XLSX = await import("xlsx");
+  const wb = XLSX.utils.book_new();
+
+  const ws = XLSX.utils.aoa_to_sheet([headers, sampleRow]);
+  if (note && ws.A2) {
+    ws.A2.c = [{ a: "GuardHub", t: note }]; // cell comment on the example row
+    ws.A2.c.hidden = true;
+  }
+  for (let c = 0; c < headers.length; c += 1) {
+    const addr = XLSX.utils.encode_cell({ r: 1, c });
+    if (ws[addr]) {
+      ws[addr].s = {
+        fill: { patternType: "solid", fgColor: { rgb: "F2F2F2" } },
+        font: { italic: true, color: { rgb: "777777" } },
+      };
+    }
+  }
+  ws["!cols"] = headers.map((h) => ({ wch: Math.max(12, String(h).length + 2) }));
+  XLSX.utils.book_append_sheet(wb, ws, sheetName);
+
+  const wsi = XLSX.utils.aoa_to_sheet(instructions.map((line) => [line]));
+  wsi["!cols"] = [{ wch: 64 }];
+  XLSX.utils.book_append_sheet(wb, wsi, "Instructions");
+
+  XLSX.writeFile(wb, filename);
+}
+
 export const ACCEPTED_EXTENSIONS = [".csv", ".xlsx", ".xls"];
 export const MAX_UPLOAD_BYTES = 10 * 1024 * 1024; // 10 MB
 

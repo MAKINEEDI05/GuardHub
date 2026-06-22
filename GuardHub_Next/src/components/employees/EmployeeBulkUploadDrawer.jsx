@@ -3,28 +3,10 @@ import Drawer from "../ui/Drawer";
 import Button from "../ui/Button";
 import Icon from "../ui/Icon";
 import { useEmployees, useBulkUploadEmployees } from "../../hooks/useEmployees";
-import { parseCsvFile, downloadCsv, downloadTemplate } from "../../utils/csv";
+import { downloadCsv } from "../../utils/csv";
+import { parseSpreadsheetFile, ACCEPTED_EXTENSIONS } from "../../utils/spreadsheet";
+import { downloadTemplate, EMPLOYEE_TEMPLATE, isTemplateSampleRow } from "../../utils/templates";
 import { toast } from "../../store/toastStore";
-
-// CSV template columns. Only empId + empName are required.
-const TEMPLATE_HEADERS = [
-  "empId",
-  "empName",
-  "empDesignation",
-  "empDepartment",
-  "empMobileNo",
-  "empAadharNo",
-  "empPanNo",
-  "empDob",
-  "empDoj",
-  "bankAccountNo",
-  "epfNo",
-  "esiNo",
-  "address",
-  "emergencyContactName",
-  "emergencyContactNumber",
-  "emergencyContactRelation",
-];
 
 const CHUNK_SIZE = 50; // rows per request, for upload progress
 const STATUS_CLASS = {
@@ -95,23 +77,26 @@ export default function EmployeeBulkUploadDrawer({ open, onClose }) {
     if (!file) return;
     setSummary(null);
     try {
-      const { rows: parsed } = await parseCsvFile(file);
+      const { rows: parsed } = await parseSpreadsheetFile(file);
       const seen = new Set(); // first occurrence wins (matches backend)
-      const classified = parsed.map((raw) => {
-        const { empId, empName, errors } = validateRow(raw);
-        let status;
-        if (errors.length) status = "Invalid";
-        else if (seen.has(empId)) status = "Duplicate";
-        else {
-          seen.add(empId);
-          status = existingIds.has(empId) ? "Update" : "Create";
-        }
-        return { raw, empId, name: empName, status, errors };
-      });
+      const classified = parsed
+        // Drop the shipped example row so an unmodified template doesn't error.
+        .filter((raw) => !isTemplateSampleRow(raw))
+        .map((raw) => {
+          const { empId, empName, errors } = validateRow(raw);
+          let status;
+          if (errors.length) status = "Invalid";
+          else if (seen.has(empId)) status = "Duplicate";
+          else {
+            seen.add(empId);
+            status = existingIds.has(empId) ? "Update" : "Create";
+          }
+          return { raw, empId, name: empName, status, errors };
+        });
       setRows(classified);
       setFileName(file.name);
     } catch {
-      toast.error("Could not read the CSV file.");
+      toast.error("Could not read the file.");
     }
   };
 
@@ -215,14 +200,14 @@ export default function EmployeeBulkUploadDrawer({ open, onClose }) {
           <div className="row mt-4 mb-4">
             <Button
               variant="outline"
-              onClick={() => downloadTemplate("employee-template.csv", TEMPLATE_HEADERS)}
+              onClick={() => downloadTemplate(EMPLOYEE_TEMPLATE)}
             >
               <Icon name="download" size={16} /> Download Template
             </Button>
             <Button variant="outline" onClick={() => fileRef.current?.click()} disabled={uploading}>
-              <Icon name="upload" size={16} /> Choose CSV
+              <Icon name="upload" size={16} /> Choose File
             </Button>
-            <input ref={fileRef} type="file" accept=".csv" hidden onChange={onFile} />
+            <input ref={fileRef} type="file" accept={ACCEPTED_EXTENSIONS.join(",")} hidden onChange={onFile} />
           </div>
 
           {fileName && rows.length > 0 && (

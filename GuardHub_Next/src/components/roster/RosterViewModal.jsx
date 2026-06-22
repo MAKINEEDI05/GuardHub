@@ -1,7 +1,7 @@
 import Button from "../ui/Button";
 import Avatar from "../ui/Avatar";
 import { WEEKDAYS, WEEKDAY_LABEL, rosterShiftClass, shiftShort } from "../../utils/constants";
-import { formatDate } from "../../utils/date";
+import { formatDateLocal } from "../../utils/date";
 
 // Simple roster details popup (old-app style): photo + name at top, identity
 // details, the full weekly shift pattern, and effective dates. `emp` (optional)
@@ -64,8 +64,8 @@ export default function RosterViewModal({ roster, emp, onClose }) {
           <h4 className="card__title" style={{ margin: "20px 0 10px" }}>Effective Dates</h4>
           {hasDates ? (
             <div className="detail-grid">
-              <Item label="Effective From">{r.shiftFromDate ? formatDate(r.shiftFromDate) : "N/A"}</Item>
-              <Item label="Effective To">{r.shiftToDate ? formatDate(r.shiftToDate) : "N/A"}</Item>
+              <Item label="Effective From">{r.shiftFromDate ? formatDateLocal(r.shiftFromDate) : "N/A"}</Item>
+              <Item label="Effective To">{r.shiftToDate ? formatDateLocal(r.shiftToDate) : "N/A"}</Item>
             </div>
           ) : (
             <p className="muted" style={{ margin: 0 }}>Permanent Schedule</p>
