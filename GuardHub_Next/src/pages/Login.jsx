@@ -5,6 +5,7 @@ import { useAuthStore } from "../store/authStore";
 import { toast } from "../store/toastStore";
 import Button from "../components/ui/Button";
 import { Field, Input } from "../components/ui/Field";
+import BrandLogo from "../components/BrandLogo";
 
 // Login. Posts { email/userName, password } to /login; the returned user object
 // IS the session (no JWT). On success store the user and go to the dashboard.
@@ -49,7 +50,7 @@ export default function Login() {
       >
         <div className="card__body" style={{ padding: 32 }}>
           <div style={{ textAlign: "center", marginBottom: 24 }}>
-            <img src="/shield.svg" alt="GuardHub" width="56" height="56" />
+            <BrandLogo alt="GuardHub" style={{ height: 56, width: "auto", objectFit: "contain" }} />
             <h1 style={{ fontSize: "1.5rem", marginTop: 12 }}>GuardHub</h1>
             <p className="muted text-sm" style={{ marginTop: 4 }}>
               Security Workforce Management

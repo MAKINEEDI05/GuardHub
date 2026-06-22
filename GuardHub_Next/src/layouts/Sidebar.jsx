@@ -3,6 +3,7 @@ import { NAV_SECTIONS } from "./navItems";
 import { useUiStore } from "../store/uiStore";
 import { useAuthStore } from "../store/authStore";
 import Icon from "../components/ui/Icon";
+import BrandLogo from "../components/BrandLogo";
 
 export default function Sidebar() {
   const collapsed = useUiStore((s) => s.collapsed);
@@ -21,7 +22,7 @@ export default function Sidebar() {
   return (
     <aside className={cls}>
       <div className="sidebar__brand">
-        <img src="/shield.svg" alt="" />
+        <BrandLogo className="sidebar__brand-logo" />
         {!collapsed && <span>GuardHub</span>}
       </div>
 
