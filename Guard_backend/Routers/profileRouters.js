@@ -21,25 +21,26 @@ if (!fs.existsSync(uploadDir)) {
   fs.mkdirSync(uploadDir, { recursive: true });
 }
 
-// Multer config
+// Multer config — the stored file is ALWAYS named "<empId><ext>" so each
+// employee has exactly one image keyed by their ID (e.g. 123.png, 309.jpg).
+// empId comes from the form body (add) or the URL param (update); the extension
+// is taken from the uploaded file and lower-cased for consistent URLs.
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
     cb(null, uploadDir);
   },
   filename: function (req, file, cb) {
-    // const empId = req.body.empId || req.params.empId;
-    const empId = req.body.empId;
+    const empId = req.body.empId || req.params.empId;
     if (!empId) return cb(new Error("empId is required for image filename"));
 
-    const ext = path.extname(file.originalname);
-    const filename = `${empId}${ext}`;
-    cb(null, filename);
+    const ext = (path.extname(file.originalname) || ".jpg").toLowerCase();
+    cb(null, `${empId}${ext}`);
   },
 });
 
 const upload = multer({
   storage: storage,
-  limits: { fileSize: 1 * 1024 * 1024 }, // 5 MB limit
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB limit
   fileFilter: (req, file, cb) => {
     const allowed = ["image/jpeg", "image/jpg", "image/png"];
     if (allowed.includes(file.mimetype)) cb(null, true);

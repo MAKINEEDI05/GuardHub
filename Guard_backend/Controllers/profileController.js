@@ -1,6 +1,27 @@
+const fs = require("fs");
+const path = require("path");
 const employe = require("../models/profileScheme");
 const roster = require("../models/rosterScheme");
 const { ACTIVE_FILTER } = require("../utils/employeeRef");
+
+const uploadDir = path.join(__dirname, "..", "uploads");
+
+// Enforce "one employee = one image": after a new photo is saved as
+// "<empId><ext>", delete any other "<empId>.*" file (e.g. a previous .jpg when
+// the new upload is .png) so an extension change never leaves a duplicate.
+const removeOtherEmpImages = (empId, keepFilename) => {
+  try {
+    const prefix = `${String(empId)}.`;
+    fs.readdirSync(uploadDir).forEach((name) => {
+      if (name.startsWith(prefix) && name !== keepFilename) {
+        fs.unlinkSync(path.join(uploadDir, name));
+      }
+    });
+  } catch (err) {
+    // Non-fatal: the DB still points at the correct file; just log it.
+    console.error("Could not clean up old employee image:", err.message);
+  }
+};
 
 // Build a cleaned, de-duplicated, alphabetically sorted list from raw field
 // values: trim whitespace, drop null/empty, and treat values that differ only
@@ -94,7 +115,10 @@ const addEmpData = async (req, res) => {
           isActive: true,
           deletedAt: null,
         });
-        if (empImage) existing.empImage = empImage;
+        if (empImage) {
+          existing.empImage = empImage;
+          removeOtherEmpImages(empId, empImage);
+        }
         await existing.save();
         return res
           .status(200)
@@ -124,6 +148,7 @@ const addEmpData = async (req, res) => {
       emergencyContactRelation,
       empImage,
     });
+    if (empImage) removeOtherEmpImages(empId, empImage);
     console.log("New Employee Data:", newEmployee);
     await newEmployee.save();
     res.status(201).json({ message: "Employee added successfully" });
@@ -170,6 +195,15 @@ const updateEmp = async (req, res) => {
   try {
     // Never let a client flip soft-delete state through the generic update path.
     const { isActive, deletedAt, ...rest } = req.body;
+
+    // A newly uploaded photo (multer saved it as "<empId><ext>") must be written
+    // to empImage — otherwise the edit "succeeds" but the new image is never
+    // recorded and the UI keeps falling back to the default avatar.
+    if (req.file) {
+      rest.empImage = req.file.filename;
+      removeOtherEmpImages(req.params.empId, req.file.filename);
+    }
+
     const update = await employe.findOneAndUpdate(
       { empId: req.params.empId, ...ACTIVE_FILTER },
       rest,
