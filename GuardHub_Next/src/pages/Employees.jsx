@@ -10,9 +10,8 @@ import EmployeeFormDrawer from "../components/employees/EmployeeFormDrawer";
 import EmployeeViewModal from "../components/employees/EmployeeViewModal";
 import EmployeeBulkUploadDrawer from "../components/employees/EmployeeBulkUploadDrawer";
 import { Select } from "../components/ui/Field";
-import { useEmployees, useDeleteEmployee } from "../hooks/useEmployees";
+import { useEmployees, useDeleteEmployee, useEmployeeFilterOptions } from "../hooks/useEmployees";
 import { downloadCsv, downloadTemplate } from "../utils/csv";
-import { DESIGNATIONS, DEPARTMENTS } from "../utils/constants";
 
 // CSV columns for export + bulk-upload template. Mirrors the legacy app so
 // existing spreadsheets keep working.
@@ -37,6 +36,11 @@ const CSV_COLUMNS = [
 
 export default function Employees() {
   const { data: employees = [], isLoading } = useEmployees();
+  // Filter dropdown values are generated live from employee data (no hardcoded
+  // lists) — new designations/departments appear automatically after upload.
+  const { data: filterOptions } = useEmployeeFilterOptions();
+  const designations = filterOptions?.designations ?? [];
+  const departments = filterOptions?.departments ?? [];
   const del = useDeleteEmployee();
 
   const [term, setTerm] = useState("");
@@ -147,14 +151,14 @@ export default function Employees() {
           value={desigFilter}
           onChange={(e) => setDesigFilter(e.target.value)}
           placeholder="All Designations"
-          options={DESIGNATIONS}
+          options={designations}
           style={{ width: 200 }}
         />
         <Select
           value={deptFilter}
           onChange={(e) => setDeptFilter(e.target.value)}
           placeholder="All Departments"
-          options={DEPARTMENTS}
+          options={departments}
           style={{ width: 180 }}
         />
         {(term || desigFilter || deptFilter) && (

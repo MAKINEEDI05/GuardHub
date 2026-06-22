@@ -19,6 +19,7 @@ export const queryClient = new QueryClient({
 // Stable query keys so caches are shared and invalidations are precise.
 export const QK = {
   employees: ["employees"],
+  employeeFilterOptions: ["employee-filter-options"],
   employee: (id) => ["employee", String(id)],
   rosters: ["rosters"],
   rostersPaged: (p = {}) => [

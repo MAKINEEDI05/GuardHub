@@ -2,6 +2,42 @@ const employe = require("../models/profileScheme");
 const roster = require("../models/rosterScheme");
 const { ACTIVE_FILTER } = require("../utils/employeeRef");
 
+// Build a cleaned, de-duplicated, alphabetically sorted list from raw field
+// values: trim whitespace, drop null/empty, and treat values that differ only
+// by case/whitespace as one (keeping the first-seen display form).
+const distinctClean = (values) => {
+  const byKey = new Map(); // lowercase key -> display (trimmed original)
+  values.forEach((v) => {
+    const trimmed = String(v ?? "").trim();
+    if (!trimmed) return;
+    const key = trimmed.toLowerCase();
+    if (!byKey.has(key)) byKey.set(key, trimmed);
+  });
+  return [...byKey.values()].sort((a, b) =>
+    a.localeCompare(b, undefined, { sensitivity: "base" })
+  );
+};
+
+// Distinct designation + department values for the Employee Management filter
+// dropdowns — generated live from active employees, so new values from bulk
+// upload / add / edit appear automatically with no code change.
+const getFilterOptions = async (req, res) => {
+  try {
+    const employees = await employe
+      .find(ACTIVE_FILTER, { empDesignation: 1, empDepartment: 1, _id: 0 })
+      .lean();
+    return res.json({
+      designations: distinctClean(employees.map((e) => e.empDesignation)),
+      departments: distinctClean(employees.map((e) => e.empDepartment)),
+    });
+  } catch (error) {
+    console.error("Error building filter options:", error);
+    return res
+      .status(500)
+      .json({ message: "Failed to load filter options", error: error.message });
+  }
+};
+
 // Add new Security
 const addEmpData = async (req, res) => {
   try {
@@ -385,4 +421,5 @@ module.exports = {
   restoreEmpById,
   updateEmp,
   bulkUpsertEmployees,
+  getFilterOptions,
 };

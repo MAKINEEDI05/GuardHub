@@ -7,6 +7,7 @@ export const ENDPOINTS = {
 
   // Employees (profile) — mounted at /emp
   employees: "/emp/get-emp-details",
+  employeeFilterOptions: "/emp/filter-options", // live distinct designations/departments
   employeeById: (empId) => `/emp/get-emp-byid/${empId}`,
   addEmployee: "/emp/add-employee", // multipart, field: empImage
   bulkUploadEmployees: "/emp/bulk-upload", // JSON { rows: [...] }, upsert by empId

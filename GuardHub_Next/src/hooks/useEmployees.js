@@ -13,6 +13,17 @@ export function useEmployees() {
   });
 }
 
+// Live distinct designation/department values for the Employee Management
+// filter dropdowns. Invalidated by every employee mutation below, so new values
+// from bulk upload / add / edit show up without any code change.
+export function useEmployeeFilterOptions() {
+  return useQuery({
+    queryKey: QK.employeeFilterOptions,
+    queryFn: employeeService.filterOptions,
+    staleTime: 5 * 60_000,
+  });
+}
+
 export function useEmployee(empId, enabled = true) {
   return useQuery({
     queryKey: QK.employee(empId),
@@ -28,6 +39,7 @@ export function useAddEmployee() {
       employeeService.add(values, imageFile),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: QK.employees });
+      qc.invalidateQueries({ queryKey: QK.employeeFilterOptions });
       toast.success("Employee added successfully.");
     },
     onError: (e) => toast.error(e.friendlyMessage || "Failed to add employee."),
@@ -40,7 +52,10 @@ export function useBulkUploadEmployees() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (rows) => employeeService.bulkUpload(rows),
-    onSuccess: () => qc.invalidateQueries({ queryKey: QK.employees }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: QK.employees });
+      qc.invalidateQueries({ queryKey: QK.employeeFilterOptions });
+    },
     onError: (e) => toast.error(e.friendlyMessage || "Bulk upload failed."),
   });
 }
@@ -53,6 +68,7 @@ export function useUpdateEmployee() {
     onSuccess: (_d, vars) => {
       qc.invalidateQueries({ queryKey: QK.employees });
       qc.invalidateQueries({ queryKey: QK.employee(vars.empId) });
+      qc.invalidateQueries({ queryKey: QK.employeeFilterOptions });
       toast.success("Employee updated successfully.");
     },
     onError: (e) =>
@@ -68,7 +84,7 @@ export function useDeleteEmployee() {
       // Deleting an employee (soft delete on the backend) changes what every
       // employee-linked screen should show, so refresh them all: employee list,
       // roster, leave/OD/OT views and the attendance reports.
-      ["employees", "rosters", "leaves", "ods", "ot", "attendance", "monthwise", "monthwise-summary"].forEach(
+      ["employees", "employee-filter-options", "rosters", "leaves", "ods", "ot", "attendance", "monthwise", "monthwise-summary"].forEach(
         (key) => qc.invalidateQueries({ queryKey: [key] })
       );
       toast.success("Employee deleted. Past records kept for audit.");

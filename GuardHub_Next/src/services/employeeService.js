@@ -19,6 +19,15 @@ export const employeeService = {
     return Array.isArray(data) ? data : [];
   },
 
+  // Live distinct designation/department values for the filter dropdowns.
+  async filterOptions() {
+    const { data } = await apiClient.get(ENDPOINTS.employeeFilterOptions);
+    return {
+      designations: Array.isArray(data?.designations) ? data.designations : [],
+      departments: Array.isArray(data?.departments) ? data.departments : [],
+    };
+  },
+
   async getById(empId) {
     const { data } = await apiClient.get(ENDPOINTS.employeeById(empId));
     return data;

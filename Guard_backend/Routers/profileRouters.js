@@ -8,6 +8,7 @@ const {
   restoreEmpById,
   updateEmp,
   bulkUpsertEmployees,
+  getFilterOptions,
 } = require("../Controllers/profileController");
 
 const multer = require("multer");
@@ -48,6 +49,9 @@ const upload = multer({
 
 // Routes
 router.get("/get-emp-details", getAllEmpData);
+// Live distinct designation/department values for the filter dropdowns.
+// Declared before the :empId route so "filter-options" isn't read as an empId.
+router.get("/filter-options", getFilterOptions);
 router.post("/add-employee", upload.single("empImage"), addEmpData);
 router.post("/bulk-upload", bulkUpsertEmployees);
 router.get("/get-emp-byid/:empId", getEmpById);
