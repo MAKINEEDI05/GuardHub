@@ -534,6 +534,60 @@ h1, h2, h3, h4, h5 {
   display: flex; gap: var(--sp-2); justify-content: flex-end;
 }
 
+/* Progress bar (bulk import) */
+.progress {
+  width: 100%;
+  height: 10px;
+  background: var(--surface-2);
+  border-radius: 999px;
+  overflow: hidden;
+}
+.progress__bar {
+  height: 100%;
+  background: var(--status-present);
+  border-radius: 999px;
+  transition: width 0.2s ease;
+}
+
+/* Inline status banner with an icon (info / ok / warn / error tones) */
+.banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: var(--fs-small);
+  border: 1px solid var(--border);
+}
+.banner--ok { color: var(--status-present); background: rgba(6, 130, 65, 0.10); border-color: rgba(6, 130, 65, 0.25); }
+.banner--warn { color: var(--status-leave); background: rgba(208, 108, 56, 0.10); border-color: rgba(208, 108, 56, 0.25); }
+.banner--error { color: var(--status-absent); background: rgba(220, 38, 38, 0.08); border-color: rgba(220, 38, 38, 0.22); }
+
+/* Numbered step chip for the bulk-import section headers */
+.step-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: var(--primary);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  flex: none;
+}
+
+/* Selected-file confirmation line (name / size / row count) */
+.filemeta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: var(--fs-small);
+  color: var(--status-present);
+}
+.filemeta strong { color: var(--text); }
+
 /* Modal (small confirm) */
 .modal {
   width: min(440px, 100%);

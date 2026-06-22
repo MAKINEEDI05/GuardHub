@@ -5,6 +5,7 @@ const {
   addEmpData,
   getEmpById,
   deleteEmpById,
+  restoreEmpById,
   updateEmp,
   bulkUpsertEmployees,
 } = require("../Controllers/profileController");
@@ -52,5 +53,6 @@ router.post("/bulk-upload", bulkUpsertEmployees);
 router.get("/get-emp-byid/:empId", getEmpById);
 router.put("/update-emp-byid/:empId", upload.single("empImage"), updateEmp);
 router.delete("/delete-emp-byid/:empId", deleteEmpById);
+router.put("/restore-emp-byid/:empId", restoreEmpById);
 
 module.exports = router;

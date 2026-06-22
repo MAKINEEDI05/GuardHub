@@ -1,4 +1,6 @@
 const employe = require("../models/profileScheme");
+const roster = require("../models/rosterScheme");
+const { ACTIVE_FILTER } = require("../utils/employeeRef");
 
 // Add new Security
 const addEmpData = async (req, res) => {
@@ -26,6 +28,47 @@ const addEmpData = async (req, res) => {
     // if (!req.file) {
     //   return res.status(400).json({ message: "Image file is required" });
     // }
+
+    // empId is the foreign key used by every other module, so it must stay
+    // unique. If a record already exists for this empId, reject when it's active
+    // (duplicate) or REACTIVATE it when it was soft-deleted (re-hire) instead of
+    // creating a second document.
+    const existing =
+      empId !== undefined && empId !== null && String(empId).trim() !== ""
+        ? await employe.findOne({ empId: Number(empId) })
+        : null;
+    if (existing) {
+      if (existing.isActive === false) {
+        existing.set({
+          empName,
+          empDesignation,
+          empMobileNo,
+          empAadharNo,
+          empPanNo,
+          empDepartment,
+          bankAccountNo,
+          epfNo,
+          esiNo,
+          address,
+          empDob,
+          empDoj,
+          emergencyContactName,
+          emergencyContactNumber,
+          emergencyContactRelation,
+          isActive: true,
+          deletedAt: null,
+        });
+        if (empImage) existing.empImage = empImage;
+        await existing.save();
+        return res
+          .status(200)
+          .json({ message: "Employee reactivated successfully" });
+      }
+      return res
+        .status(409)
+        .json({ message: `Employee ${empId} already exists` });
+    }
+
     const newEmployee = new employe({
       empName,
       empDesignation,
@@ -55,24 +98,29 @@ const addEmpData = async (req, res) => {
   }
 };
 
-// getdetails from db
+// getdetails from db — active employees only (the single source of truth for
+// every other module). Pass ?includeInactive=true for an admin/audit view.
 const getAllEmpData = async (req, res) => {
   try {
-    const employees = await employe.find();
+    const includeInactive = String(req.query.includeInactive) === "true";
+    const filter = includeInactive ? {} : ACTIVE_FILTER;
+    const employees = await employe.find(filter);
     res.json(employees);
   } catch (error) {
     res.status(500).json({ message: "Error fetching products", error });
   }
 };
 
-// getByempId
-
+// getByempId — a soft-deleted employee is reported distinctly (req 14).
 const getEmpById = async (req, res) => {
   try {
     const { empId } = req.params;
     const employee = await employe.findOne({ empId: empId });
     if (!employee) {
-      return res.status(404).json({ message: "Employee not found" });
+      return res.status(404).json({ message: "Employee not found." });
+    }
+    if (employee.isActive === false) {
+      return res.status(404).json({ message: "Employee has been deleted." });
     }
     return res.json(employee);
   } catch (error) {
@@ -81,17 +129,20 @@ const getEmpById = async (req, res) => {
   }
 };
 
-// update by empId
-
+// update by empId — only an active employee can be edited.
 const updateEmp = async (req, res) => {
   try {
+    // Never let a client flip soft-delete state through the generic update path.
+    const { isActive, deletedAt, ...rest } = req.body;
     const update = await employe.findOneAndUpdate(
-      { empId: req.params.empId }, // make sure empId is a number if your DB stores it as Number
-      req.body,
+      { empId: req.params.empId, ...ACTIVE_FILTER },
+      rest,
       { new: true, runValidators: true }
     );
     if (!update) {
-      return res.status(404).json({ message: "Employee not found" });
+      return res
+        .status(404)
+        .json({ message: "Employee not found or has been deleted." });
     }
     return res.json({
       message: "Employee details updated successfully",
@@ -106,19 +157,59 @@ const updateEmp = async (req, res) => {
   }
 };
 
-// Delete by empId
+// Delete by empId — SOFT delete. The employee is marked inactive (so it leaves
+// every active list/search/report/apply form) and its current roster assignment
+// is removed (a roster entry must always belong to a valid employee), while
+// historical leave/OD/OT/attendance records are retained for audit.
 const deleteEmpById = async (req, res) => {
   try {
     const { empId } = req.params;
-    const DeleteEmployee = await employe.findOneAndDelete({ empId: empId });
-    if (!DeleteEmployee) {
-      return res.status(404).json({ message: "Employee not found" });
+    const employee = await employe.findOne({ empId: empId });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found." });
+    }
+    if (employee.isActive === false) {
+      return res
+        .status(409)
+        .json({ message: "Employee has already been deleted." });
     }
 
-    res.json(`emp delete successfully${DeleteEmployee}`);
+    employee.isActive = false;
+    employee.deletedAt = new Date();
+    await employee.save();
+
+    // Roster is a current assignment, not audit history — drop it so the guard
+    // never shows up in roster views again.
+    await roster.deleteOne({ empId: String(empId) });
+
+    res.json({
+      message:
+        "Employee deleted successfully. Historical records are retained for audit.",
+    });
   } catch (error) {
     console.error("Error deleting employee:", error);
     res.status(500).json({ message: "Error deleting employee", error });
+  }
+};
+
+// Restore a soft-deleted employee (re-activate).
+const restoreEmpById = async (req, res) => {
+  try {
+    const { empId } = req.params;
+    const employee = await employe.findOne({ empId: empId });
+    if (!employee) {
+      return res.status(404).json({ message: "Employee not found." });
+    }
+    if (employee.isActive !== false) {
+      return res.status(409).json({ message: "Employee is already active." });
+    }
+    employee.isActive = true;
+    employee.deletedAt = null;
+    await employee.save();
+    res.json({ message: "Employee restored successfully" });
+  } catch (error) {
+    console.error("Error restoring employee:", error);
+    res.status(500).json({ message: "Error restoring employee", error });
   }
 };
 
@@ -212,7 +303,14 @@ const bulkUpsertEmployees = async (req, res) => {
       }
       seen.add(empIdStr);
 
-      const set = { empId: Number(empIdStr), empName };
+      // Re-uploading an employee re-activates them if they were soft-deleted,
+      // keeping Employee Management the source of truth.
+      const set = {
+        empId: Number(empIdStr),
+        empName,
+        isActive: true,
+        deletedAt: null,
+      };
       setIf(set, "empDesignation", row.empDesignation);
       setIf(set, "empDepartment", row.empDepartment);
       if (mobile) set.empMobileNo = Number(mobile);
@@ -284,6 +382,7 @@ module.exports = {
   addEmpData,
   getEmpById,
   deleteEmpById,
+  restoreEmpById,
   updateEmp,
   bulkUpsertEmployees,
 };

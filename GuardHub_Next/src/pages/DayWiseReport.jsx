@@ -15,8 +15,9 @@ import { useEmployees } from "../hooks/useEmployees";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
 import { downloadCsv } from "../utils/csv";
 
-// Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date
-// (the REAL biometric collection secattendancelogs, joined to employee + roster).
+// Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date —
+// the PROCESSED `empAttendance` collection (one row per employee per day),
+// joined to the employee master for name/designation/department/photo.
 const CSV_COLUMNS = [
   { key: "empId", label: "Employee ID" },
   { key: "empName", label: "Name" },
@@ -25,7 +26,6 @@ const CSV_COLUMNS = [
   { key: "empShift", label: "Shift" },
   { key: "empInTime", label: "In Time" },
   { key: "empOutTime", label: "Out Time" },
-  { key: "punches", label: "Punches" },
   { key: "empAction", label: "Status" },
   { key: "empDate", label: "Date" },
 ];
@@ -90,7 +90,7 @@ export default function DayWiseReport() {
       key: "empName",
       header: "Employee",
       sortable: true,
-      width: "34%",
+      width: "30%",
       render: (r) => (
         <EmployeeTableCell
           emp={empMap.get(String(r.empId))}
@@ -100,14 +100,14 @@ export default function DayWiseReport() {
         />
       ),
     },
-    { key: "empShift", header: "Shift", width: "16%", render: (r) => r.empShift || "—" },
-    { key: "empInTime", header: "In Time", width: "13%", render: (r) => r.empInTime || "—" },
-    { key: "empOutTime", header: "Out Time", width: "13%", render: (r) => r.empOutTime || "—" },
-    { key: "punches", header: "Punches", className: "num", width: "9%", sortable: true, render: (r) => r.punches ?? "—" },
+    { key: "empDepartment", header: "Department", width: "14%", sortable: true, render: (r) => r.empDepartment || "—" },
+    { key: "empShift", header: "Shift", width: "14%", render: (r) => r.empShift || "—" },
+    { key: "empInTime", header: "In Time", width: "12%", render: (r) => r.empInTime || "—" },
+    { key: "empOutTime", header: "Out Time", width: "12%", render: (r) => r.empOutTime || "—" },
     {
       key: "empAction",
       header: "Status",
-      width: "15%",
+      width: "14%",
       render: (r) => <Badge status={r.empAction}>{r.empAction || "—"}</Badge>,
     },
   ];
@@ -116,7 +116,7 @@ export default function DayWiseReport() {
     <>
       <PageHeader
         title="Day Wise Report"
-        subtitle="Attendance from the biometric log (secattendancelogs)"
+        subtitle="Processed daily attendance (empAttendance), joined to Employee Management"
       />
 
       {/* Toolbar — date, search and export as one aligned, responsive row */}
@@ -170,7 +170,7 @@ export default function DayWiseReport() {
           pageSize={20}
           pageSizeOptions={[20, 50, 100]}
           emptyTitle="No attendance records available"
-          emptyMessage="No biometric punches were found for the selected date."
+          emptyMessage="No processed attendance records were found for the selected date."
           emptyIcon="🗓️"
         />
       )}

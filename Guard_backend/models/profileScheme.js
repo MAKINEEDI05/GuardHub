@@ -77,6 +77,19 @@ const EmpDetails = new mongoose.Schema(
       type: String,
       required: false,
     },
+    // Soft-delete flag. Employee Management is the single source of truth, so a
+    // "deleted" employee is marked inactive (not removed) — historical leave/OD/
+    // OT/attendance records are kept for audit while the employee disappears from
+    // every active-facing list, search, roster, report and apply form.
+    // Missing/undefined is treated as active (back-compat with existing docs).
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    deletedAt: {
+      type: Date,
+      default: null,
+    },
   },
   { versionKey: false, timestamps: true } // ignore __v id
 );

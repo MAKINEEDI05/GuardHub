@@ -189,7 +189,11 @@ export default function Employees() {
       <ConfirmDialog
         open={!!confirm}
         title="Delete employee?"
-        message={confirm ? `This permanently removes ${confirm.empName} (ID ${confirm.empId}).` : ""}
+        message={
+          confirm
+            ? `${confirm.empName} (ID ${confirm.empId}) will be removed from all active lists, roster and reports. Their past leave/OD/OT and attendance records are kept for audit.`
+            : ""
+        }
         confirmLabel="Delete"
         loading={del.isPending}
         onCancel={() => setConfirm(null)}

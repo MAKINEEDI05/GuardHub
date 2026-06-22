@@ -4,6 +4,7 @@ const od_mgmt = require("../models/odScheme");
 const ot_mgmt = require("../models/otScheme");
 const roster_mgmt = require("../models/rosterScheme");
 const employe = require("../models/profileScheme");
+const { ACTIVE_FILTER } = require("../utils/employeeRef");
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const WEEKDAYS = [
@@ -261,7 +262,9 @@ const getMonthwiseSummary = async (req, res) => {
       ];
     }
 
-    const employees = await employe.find(empFilter).lean();
+    // Reports only ever cover active employees — deleted guards drop out of every
+    // summary automatically (req 11).
+    const employees = await employe.find({ ...empFilter, ...ACTIVE_FILTER }).lean();
 
     const zeroTotals = {
       totalEmployees: 0,

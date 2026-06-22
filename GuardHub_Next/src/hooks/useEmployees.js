@@ -65,8 +65,13 @@ export function useDeleteEmployee() {
   return useMutation({
     mutationFn: (empId) => employeeService.remove(empId),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QK.employees });
-      toast.success("Employee deleted.");
+      // Deleting an employee (soft delete on the backend) changes what every
+      // employee-linked screen should show, so refresh them all: employee list,
+      // roster, leave/OD/OT views and the attendance reports.
+      ["employees", "rosters", "leaves", "ods", "ot", "attendance", "monthwise", "monthwise-summary"].forEach(
+        (key) => qc.invalidateQueries({ queryKey: [key] })
+      );
+      toast.success("Employee deleted. Past records kept for audit.");
     },
     onError: (e) =>
       toast.error(e.friendlyMessage || "Failed to delete employee."),

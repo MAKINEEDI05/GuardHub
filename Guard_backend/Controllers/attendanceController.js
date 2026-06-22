@@ -2,8 +2,8 @@ const EmpAttendance = require("../models/attendanceScheme");
 const axios = require("axios");
 const roster_mgmt = require("../models/rosterScheme");
 const leave_mgmt = require("../models/leaveScheme");
-const SecAttendanceLogs = require("../models/secMainAttendaceScheme");
 const employe = require("../models/profileScheme");
+const { ACTIVE_FILTER } = require("../utils/employeeRef");
 
 const WEEKDAYS = [
   "sunday",
@@ -14,13 +14,6 @@ const WEEKDAYS = [
   "friday",
   "saturday",
 ];
-
-// Format a Date's wall-clock (UTC components) as HH:mm:ss.
-const fmtTime = (d) => {
-  const x = new Date(d);
-  const p = (n) => String(n).padStart(2, "0");
-  return `${p(x.getUTCHours())}:${p(x.getUTCMinutes())}:${p(x.getUTCSeconds())}`;
-};
 
 // Attendance only exists up to today; reject future dates everywhere. Keep this
 // wording in sync with the frontend (GuardHub_Next utils/date.js).
@@ -251,9 +244,12 @@ const getAttendanceByEmpId = async (req, res) => {
   }
 };
 // Get attendance by date — sourced from the REAL biometric collection
-// (secattendancelogs), since empattendances is empty.
-// For the selected date: group logs by EmployeeCode, take first/last punch,
-// join securitydetails (EmployeeCode == empId) + roster for the day's shift.
+// Day Wise Report — PRIMARY SOURCE is the processed `empAttendance` collection
+// (one row per employee per day: empShift/empInTime/empOutTime/empAction/etc.),
+// NOT the raw biometric logs. We filter empAttendance by empDate for the chosen
+// day and join the ACTIVE employee master by empId for name/designation/
+// department/photo (the single source of truth). Status comes straight from
+// `empAction` (PRESENT / ABSENT / LEAVE / OD / OT / WEEK OFF).
 const getAttendanceByDate = async (req, res) => {
   try {
     const { empDate } = req.params; // expecting format: yyyy-mm-dd
@@ -274,54 +270,45 @@ const getAttendanceByDate = async (req, res) => {
     }
     const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
 
-    // Group biometric logs by employee -> first punch (min), last punch (max).
-    const grouped = await SecAttendanceLogs.aggregate([
-      { $match: { LogDateTime: { $gte: startOfDay, $lt: endOfDay } } },
-      {
-        $group: {
-          _id: "$EmployeeCode",
-          firstPunch: { $min: "$LogDateTime" },
-          lastPunch: { $max: "$LogDateTime" },
-          punches: { $sum: 1 },
-        },
-      },
-      { $sort: { _id: 1 } },
+    // Processed attendance for the day + active employee master + roster (only
+    // used as a shift fallback when a row doesn't carry empShift).
+    const [records, employees, rosters] = await Promise.all([
+      EmpAttendance.find({
+        empDate: { $gte: startOfDay, $lt: endOfDay },
+      }).lean(),
+      employe.find(ACTIVE_FILTER).lean(),
+      roster_mgmt.find({}, { empId: 1, weeklyShifts: 1 }).lean(),
     ]);
 
-    if (!grouped.length) {
-      return res
-        .status(200)
-        .json({ message: `Attendance records for ${empDate}`, data: [] });
-    }
-
-    // Join employee + roster details (EmployeeCode is String, empId may be
-    // Number, so key both maps by String).
-    const [employees, rosters] = await Promise.all([
-      employe.find(),
-      roster_mgmt.find(),
-    ]);
     const empMap = new Map(employees.map((e) => [String(e.empId), e]));
     const rosterMap = new Map(rosters.map((r) => [String(r.empId), r]));
     const weekday = WEEKDAYS[startOfDay.getUTCDay()];
 
-    const data = grouped.map((g) => {
-      const code = String(g._id);
-      const emp = empMap.get(code);
-      const roster = rosterMap.get(code);
-      return {
-        empId: code,
-        empName: emp ? emp.empName : "Unknown",
-        empDesignation: emp ? emp.empDesignation : "",
-        empDepartment: emp ? emp.empDepartment : "",
-        empInTime: fmtTime(g.firstPunch),
-        empOutTime: fmtTime(g.lastPunch),
-        empShift: roster && roster.weeklyShifts ? roster.weeklyShifts[weekday] || "" : "",
-        empWeekOff: "",
-        empAction: "Present",
-        empDate,
-        punches: g.punches,
-      };
-    });
+    // Show only rows that belong to an active employee; enrich each from the
+    // employee master so names/designations always match Employee Management.
+    const data = records
+      .filter((r) => empMap.has(String(r.empId)))
+      .map((r) => {
+        const code = String(r.empId);
+        const emp = empMap.get(code);
+        const roster = rosterMap.get(code);
+        const rosterShift =
+          roster && roster.weeklyShifts ? roster.weeklyShifts[weekday] || "" : "";
+        return {
+          empId: code,
+          empName: emp.empName || "",
+          empDesignation: emp.empDesignation || "",
+          empDepartment: emp.empDepartment || "",
+          empImage: emp.empImage || "",
+          empShift: r.empShift || rosterShift,
+          empInTime: r.empInTime || "",
+          empOutTime: r.empOutTime || "",
+          empWeekOff: r.empWeekOff || "",
+          empAction: r.empAction || "",
+          empDate,
+        };
+      })
+      .sort((a, b) => Number(a.empId) - Number(b.empId));
 
     res.status(200).json({
       message: `Attendance records for ${empDate}`,

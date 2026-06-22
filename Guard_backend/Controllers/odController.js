@@ -1,4 +1,8 @@
 const od = require("../models/odScheme");
+const {
+  resolveActiveEmployee,
+  getActiveEmployeeIds,
+} = require("../utils/employeeRef");
 
 // Add new od request
 const addOd = async (req, res) => {
@@ -13,6 +17,12 @@ const addOd = async (req, res) => {
       empPurpose,
       odLocation,
     } = req.body;
+
+    // An OD can only be filed for a valid, active employee (req 7/14).
+    const check = await resolveActiveEmployee(empId);
+    if (!check.ok) {
+      return res.status(check.status).json({ message: check.message });
+    }
 
     const newOd = new od({
       empId,
@@ -152,7 +162,10 @@ const getMonthwiseOds = async (req, res) => {
   }
 
   try {
+    // Only surface ODs that belong to an active employee.
+    const { numbers: activeIds } = await getActiveEmployeeIds();
     const ods = await od.find({
+      empId: { $in: activeIds },
       empFromDate: {
         $gte: new Date(fromDate),
         $lte: new Date(new Date(toDate).setHours(23, 59, 59, 999)),

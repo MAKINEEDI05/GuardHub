@@ -1,4 +1,8 @@
 const Leave = require("../models/leaveScheme");
+const {
+  resolveActiveEmployee,
+  getActiveEmployeeIds,
+} = require("../utils/employeeRef");
 
 // Add new leave request
 const addLeave = async (req, res) => {
@@ -12,6 +16,12 @@ const addLeave = async (req, res) => {
       empOdType,
       empReason,
     } = req.body;
+
+    // A leave can only be filed for a valid, active employee (req 7/14).
+    const check = await resolveActiveEmployee(empId);
+    if (!check.ok) {
+      return res.status(check.status).json({ message: check.message });
+    }
 
     const newLeave = new Leave({
       empId,
@@ -153,7 +163,11 @@ const getMonthwiseLeaves = async (req, res) => {
   }
 
   try {
+    // Only surface leaves that belong to an active employee — a deleted
+    // employee's historical records stay in the DB but never show in the view.
+    const { numbers: activeIds } = await getActiveEmployeeIds();
     const leaves = await Leave.find({
+      empId: { $in: activeIds },
       empFromDate: {
         $gte: new Date(fromDate),
         $lte: new Date(new Date(toDate).setHours(23, 59, 59, 999)), // include end of day

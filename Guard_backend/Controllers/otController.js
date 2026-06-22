@@ -1,5 +1,9 @@
 const ot = require("../models/otScheme");
 const employe = require("../models/profileScheme");
+const {
+  resolveActiveEmployee,
+  getActiveEmployeeIds,
+} = require("../utils/employeeRef");
 
 const { SHIFTS, DURATIONS, STATUSES } = ot;
 
@@ -54,12 +58,11 @@ const applyOt = async (req, res) => {
     }
 
     const employeeId = parseInt(req.body.employeeId, 10);
-    const employee = await employe.findOne({ empId: employeeId });
-    if (!employee) {
-      return res.status(404).json({
-        message: `Employee ${employeeId} not found in securitydetails`,
-      });
+    const check = await resolveActiveEmployee(employeeId);
+    if (!check.ok) {
+      return res.status(check.status).json({ message: check.message });
     }
+    const employee = check.employee;
 
     const newOt = new ot({
       employeeId,
@@ -89,10 +92,13 @@ const applyOt = async (req, res) => {
   }
 };
 
-// Get all OT records (newest first).
+// Get all OT records (newest first) — only for active employees.
 const getAllOt = async (req, res) => {
   try {
-    const records = await ot.find().sort({ createdAt: -1 });
+    const { numbers: activeIds } = await getActiveEmployeeIds();
+    const records = await ot
+      .find({ employeeId: { $in: activeIds } })
+      .sort({ createdAt: -1 });
     return res.status(200).json({ message: "OT records", data: records });
   } catch (error) {
     console.error("Error fetching OT:", error);
@@ -137,14 +143,12 @@ const updateOt = async (req, res) => {
     // Employee identity is derived, not client-supplied; refresh it if the
     // linked employee changes.
     if (update.employeeId !== undefined) {
-      const employeeId = parseInt(update.employeeId, 10);
-      const employee = await employe.findOne({ empId: employeeId });
-      if (!employee) {
-        return res
-          .status(404)
-          .json({ message: `Employee ${employeeId} not found` });
+      const check = await resolveActiveEmployee(update.employeeId);
+      if (!check.ok) {
+        return res.status(check.status).json({ message: check.message });
       }
-      update.employeeId = employeeId;
+      const employee = check.employee;
+      update.employeeId = employee.empId;
       update.employeeName = employee.empName;
       update.designation = employee.empDesignation;
       update.department = employee.empDepartment;
