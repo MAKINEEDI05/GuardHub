@@ -11,10 +11,8 @@ import { EmptyState, TableSkeleton } from "../components/ui/States";
 import RosterEditDrawer from "../components/roster/RosterEditDrawer";
 import RosterViewModal from "../components/roster/RosterViewModal";
 import BulkUploadDrawer from "../components/roster/BulkUploadDrawer";
-import { useRostersPaged, useDeleteRoster } from "../hooks/useRoster";
+import { useRosters, useDeleteRoster } from "../hooks/useRoster";
 import { useEmployees } from "../hooks/useEmployees";
-import { rosterService } from "../services/rosterService";
-import { toast } from "../store/toastStore";
 import {
   WEEKDAYS,
   WEEKDAY_LABEL,
@@ -27,13 +25,12 @@ import { exportFilteredCsv } from "../utils/exportCsv";
 
 const PAGE_SIZES = [20, 50, 100];
 
-// Security Roster — scannable weekly grid with server-side pagination so the
-// page stays fast as the roster grows. Search/shift/department filtering and
-// paging all happen on the backend; only one page of rows is fetched at a time.
+// Security Roster — scannable weekly grid. The full roster (small dataset) is
+// loaded once and filtered/paginated CLIENT-SIDE, so a single `filtered` array
+// drives BOTH the table and Export. That guarantees "what you see is what you
+// export" with no separate query.
 export default function Roster() {
-  // Filter + paging state.
   const [term, setTerm] = useState("");
-  const [search, setSearch] = useState("");
   const [shiftFilter, setShiftFilter] = useState("");
   const [deptFilter, setDeptFilter] = useState("");
   const [page, setPage] = useState(1);
@@ -43,29 +40,11 @@ export default function Roster() {
   const [viewing, setViewing] = useState(null);
   const [bulkOpen, setBulkOpen] = useState(false);
   const [confirm, setConfirm] = useState(null);
-  const [exporting, setExporting] = useState(false);
 
-  // Debounce the search box, and reset to page 1 whenever the query changes.
-  useEffect(() => {
-    const t = setTimeout(() => {
-      setSearch(term.trim());
-      setPage(1);
-    }, 300);
-    return () => clearTimeout(t);
-  }, [term]);
-
-  const params = useMemo(
-    () => ({ page, limit: pageSize, search, shift: shiftFilter, department: deptFilter }),
-    [page, pageSize, search, shiftFilter, deptFilter]
-  );
-  const { data, isLoading, isFetching } = useRostersPaged(params);
-  const records = data?.records ?? [];
-  const total = data?.totalRecords ?? 0;
-  const totalPages = data?.totalPages ?? 1;
-
+  const { data: rosters = [], isLoading } = useRosters();
   const del = useDeleteRoster();
 
-  // Employee master (cached) for photos, designation/department fallback, and
+  // Employee master (cached) for photos + designation/department fallback and
   // the department filter options.
   const { data: employees = [] } = useEmployees();
   const empMap = useMemo(() => {
@@ -78,51 +57,98 @@ export default function Roster() {
     [employees]
   );
 
-  // Filter-change handlers reset to page 1.
-  const onShift = (v) => { setShiftFilter(v); setPage(1); };
-  const onDept = (v) => { setDeptFilter(v); setPage(1); };
-  const onPageSize = (n) => { setPageSize(n); setPage(1); };
-  const clearAll = () => { setTerm(""); setSearch(""); setShiftFilter(""); setDeptFilter(""); setPage(1); };
+  // Each roster row enriched with resolved designation/department (roster value,
+  // falling back to the employee master) — used for both display and filtering.
+  const resolved = useMemo(
+    () =>
+      rosters.map((r) => {
+        const emp = empMap.get(String(r.empId));
+        return {
+          ...r,
+          _emp: emp,
+          _designation: r.designation || emp?.empDesignation || "",
+          _department: r.department || emp?.empDepartment || "",
+        };
+      }),
+    [rosters, empMap]
+  );
 
-  // Export respects the active filters (search/shift/department) and spans ALL
-  // pages — fetched in one request with the same filters as the table.
-  const isFiltered = !!(search || shiftFilter || deptFilter);
-  const exportCsv = async () => {
-    setExporting(true);
-    try {
-      const all = await rosterService.listAllFiltered({
-        search,
-        shift: shiftFilter,
-        department: deptFilter,
-      });
-      const cols = [
-        { key: "empId", label: "Employee ID" }, { key: "empName", label: "Name" },
-        { key: "mobileNo", label: "Mobile No" }, { key: "department", label: "Department" },
-        { key: "designation", label: "Designation" },
-        ...WEEKDAYS.map((d) => ({ key: d, label: WEEKDAY_LABEL[d] })),
-        { key: "from", label: "Shift From Date" }, { key: "to", label: "Shift To Date" },
-      ];
-      const rows = all.map((r) => ({
-        ...r,
-        ...WEEKDAYS.reduce((acc, d) => ({ ...acc, [d]: r.weeklyShifts?.[d] || "" }), {}),
-        from: r.shiftFromDate ? formatDateLocal(r.shiftFromDate) : "",
-        to: r.shiftToDate ? formatDateLocal(r.shiftToDate) : "",
-      }));
-      exportFilteredCsv({
-        baseName: "security-roster",
-        columns: cols,
-        rows,
-        isFiltered,
-        noun: "roster records",
-      });
-    } catch {
-      toast.error("Could not export the roster.");
-    } finally {
-      setExporting(false);
-    }
+  const isFiltered = !!(term.trim() || shiftFilter || deptFilter);
+
+  // THE single filtered dataset — used by the table AND Export.
+  // - search: Employee Name / ID / Designation / Department (substring)
+  // - shift:  any weekday equals the selected shift
+  // - dept:   exact department match
+  const filtered = useMemo(() => {
+    const q = term.trim().toLowerCase();
+    return resolved.filter((r) => {
+      if (q) {
+        const hay = [r.empId, r.empName, r._designation, r._department].map((v) =>
+          String(v ?? "").toLowerCase()
+        );
+        if (!hay.some((v) => v.includes(q))) return false;
+      }
+      if (shiftFilter && !WEEKDAYS.some((d) => r.weeklyShifts?.[d] === shiftFilter)) {
+        return false;
+      }
+      if (deptFilter && r._department !== deptFilter) return false;
+      return true;
+    });
+  }, [resolved, term, shiftFilter, deptFilter]);
+
+  // Reset to page 1 whenever a filter changes.
+  useEffect(() => {
+    setPage(1);
+  }, [term, shiftFilter, deptFilter]);
+
+  const total = filtered.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const currentPage = Math.min(page, totalPages);
+  const pageRows = filtered.slice(
+    (currentPage - 1) * pageSize,
+    currentPage * pageSize
+  );
+
+  const onPageSize = (n) => {
+    setPageSize(n);
+    setPage(1);
+  };
+  const clearAll = () => {
+    setTerm("");
+    setShiftFilter("");
+    setDeptFilter("");
+    setPage(1);
   };
 
-  const hasFilters = term || shiftFilter || deptFilter;
+  // Export the EXACT filtered dataset (all matching rows across pages). No
+  // filters -> the complete roster. Reuses `filtered`; no separate query.
+  const exportCsv = () => {
+    const cols = [
+      { key: "empId", label: "Employee ID" },
+      { key: "empName", label: "Employee Name" },
+      { key: "designation", label: "Designation" },
+      { key: "department", label: "Department" },
+      ...WEEKDAYS.map((d) => ({ key: d, label: `${WEEKDAY_LABEL[d]} Shift` })),
+      { key: "from", label: "Effective From Date" },
+      { key: "to", label: "Effective To Date" },
+    ];
+    const rows = filtered.map((r) => ({
+      empId: r.empId,
+      empName: r.empName,
+      designation: r._designation,
+      department: r._department,
+      ...WEEKDAYS.reduce((acc, d) => ({ ...acc, [d]: r.weeklyShifts?.[d] || "" }), {}),
+      from: r.shiftFromDate ? formatDateLocal(r.shiftFromDate) : "",
+      to: r.shiftToDate ? formatDateLocal(r.shiftToDate) : "",
+    }));
+    exportFilteredCsv({
+      baseName: "security-roster",
+      columns: cols,
+      rows,
+      isFiltered,
+      noun: "roster records",
+    });
+  };
 
   return (
     <>
@@ -131,7 +157,7 @@ export default function Roster() {
         subtitle={`${total} rostered employee${total === 1 ? "" : "s"}`}
         actions={
           <>
-            <Button variant="outline" loading={exporting} onClick={exportCsv}>
+            <Button variant="outline" disabled={!filtered.length} onClick={exportCsv}>
               <Icon name="download" size={16} /> Export
             </Button>
             <Button variant="outline" onClick={() => setBulkOpen(true)}>
@@ -146,15 +172,15 @@ export default function Roster() {
 
       <div className="toolbar">
         <SearchBar value={term} onChange={setTerm} placeholder="Search by name, ID, designation, department..." />
-        <Select value={shiftFilter} onChange={(e) => onShift(e.target.value)} placeholder="All Shifts" options={ROSTER_SHIFTS} style={{ width: 160 }} />
-        <Select value={deptFilter} onChange={(e) => onDept(e.target.value)} placeholder="All Departments" options={departments} style={{ width: 180 }} />
-        {hasFilters && (
+        <Select value={shiftFilter} onChange={(e) => setShiftFilter(e.target.value)} placeholder="All Shifts" options={ROSTER_SHIFTS} style={{ width: 160 }} />
+        <Select value={deptFilter} onChange={(e) => setDeptFilter(e.target.value)} placeholder="All Departments" options={departments} style={{ width: 180 }} />
+        {isFiltered && (
           <Button variant="ghost" size="sm" onClick={clearAll}>Clear</Button>
         )}
       </div>
 
       <div className="card" style={{ overflow: "hidden" }}>
-        <div className="table-wrap" style={{ opacity: !isLoading && isFetching ? 0.6 : 1, transition: "opacity .15s" }}>
+        <div className="table-wrap">
           <table className="table table--compact">
             <thead>
               <tr>
@@ -170,20 +196,19 @@ export default function Roster() {
               <TableSkeleton rows={pageSize > 10 ? 10 : pageSize} cols={WEEKDAYS.length + 3} />
             ) : (
               <tbody>
-                {records.map((r) => {
-                  const emp = empMap.get(String(r.empId));
-                  const designation = r.designation || emp?.empDesignation;
+                {pageRows.map((r) => {
+                  const designation = r._designation;
                   return (
                     <tr key={r._id || r.empId}>
                       <td>
                         <div className="emp-cell">
                           <EmployeePhotoHover
-                            emp={{ empId: r.empId, empImage: emp?.empImage }}
+                            emp={{ empId: r.empId, empImage: r._emp?.empImage }}
                             px={60}
                             name={r.empName}
                             empId={r.empId}
                             designation={designation}
-                            department={r.department || emp?.empDepartment}
+                            department={r._department}
                           />
                           <div>
                             <div className="emp-cell__name">{r.empName}</div>
@@ -235,24 +260,23 @@ export default function Roster() {
           </table>
         </div>
 
-        {!isLoading && records.length === 0 && (
+        {!isLoading && total === 0 && (
           <EmptyState
             icon="🛡️"
             title="No roster entries"
-            message={hasFilters ? "No records match your search/filters." : "Add an entry or bulk upload a roster CSV."}
+            message={isFiltered ? "No records match your search/filters." : "Add an entry or bulk upload a roster CSV."}
           />
         )}
 
         {!isLoading && total > 0 && (
           <Pagination
-            page={page}
+            page={currentPage}
             pageSize={pageSize}
             total={total}
             totalPages={totalPages}
             onPageChange={setPage}
             onPageSizeChange={onPageSize}
             pageSizes={PAGE_SIZES}
-            busy={isFetching}
           />
         )}
       </div>
