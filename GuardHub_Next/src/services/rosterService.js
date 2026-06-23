@@ -36,6 +36,20 @@ export const rosterService = {
     };
   },
 
+  // Full roster list with the SAME filters as the table but no pagination —
+  // used by Export so the CSV reflects the active search/shift/department
+  // filters across all pages. Omitting page/limit makes the backend return the
+  // complete filtered array.
+  async listAllFiltered({ search = "", shift = "", department = "" } = {}) {
+    const params = {};
+    if (search) params.search = search;
+    if (shift) params.shift = shift;
+    if (department) params.department = department;
+    const { data } = await apiClient.get(ENDPOINTS.rosters, { params });
+    if (Array.isArray(data)) return data;
+    return data?.records || [];
+  },
+
   async byEmp(empId) {
     const { data } = await apiClient.get(ENDPOINTS.rosterByEmp(empId));
     return Array.isArray(data) ? data : [];

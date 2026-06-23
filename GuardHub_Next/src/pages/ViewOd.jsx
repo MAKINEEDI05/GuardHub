@@ -11,7 +11,7 @@ import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useOds, useDeleteOd } from "../hooks/useOds";
 import { useEmployees } from "../hooks/useEmployees";
 import { formatDate } from "../utils/date";
-import { downloadCsv } from "../utils/csv";
+import { exportFilteredCsv } from "../utils/exportCsv";
 
 export default function ViewOd() {
   const { data: ods = [], isLoading } = useOds();
@@ -76,11 +76,17 @@ export default function ViewOd() {
         subtitle={`${ods.length} on-duty requests`}
         actions={
           <>
-            <Button variant="outline" disabled={!rows.length} onClick={() => downloadCsv("od-records.csv", [
-              { key: "empId", label: "Employee ID" }, { key: "name", label: "Name" }, { key: "location", label: "Location" },
-              { key: "from", label: "From" }, { key: "to", label: "To" }, { key: "duration", label: "Duration" },
-              { key: "shift", label: "Shift" }, { key: "purpose", label: "Purpose" },
-            ], exportRows)}>
+            <Button variant="outline" disabled={!rows.length} onClick={() => exportFilteredCsv({
+              baseName: "od-records",
+              columns: [
+                { key: "empId", label: "Employee ID" }, { key: "name", label: "Name" }, { key: "location", label: "Location" },
+                { key: "from", label: "From" }, { key: "to", label: "To" }, { key: "duration", label: "Duration" },
+                { key: "shift", label: "Shift" }, { key: "purpose", label: "Purpose" },
+              ],
+              rows: exportRows,
+              isFiltered: !!term.trim(),
+              noun: "OD records",
+            })}>
               <Icon name="download" size={16} /> Export
             </Button>
             <Link className="btn btn--primary" to="/apply/od"><Icon name="plus" size={16} /> Apply OD</Link>

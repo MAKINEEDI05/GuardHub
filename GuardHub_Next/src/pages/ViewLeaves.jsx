@@ -11,7 +11,7 @@ import { Link } from "react-router-dom";
 import { useLeaves, useDeleteLeave } from "../hooks/useLeaves";
 import { useEmployees } from "../hooks/useEmployees";
 import { formatDate } from "../utils/date";
-import { downloadCsv } from "../utils/csv";
+import { exportFilteredCsv } from "../utils/exportCsv";
 
 export default function ViewLeaves() {
   const { data: leaves = [], isLoading } = useLeaves();
@@ -78,11 +78,17 @@ export default function ViewLeaves() {
         subtitle={`${leaves.length} leave requests`}
         actions={
           <>
-            <Button variant="outline" disabled={!rows.length} onClick={() => downloadCsv("leaves.csv", [
-              { key: "empId", label: "Employee ID" }, { key: "name", label: "Name" }, { key: "type", label: "Type" },
-              { key: "from", label: "From" }, { key: "to", label: "To" }, { key: "duration", label: "Duration" },
-              { key: "shift", label: "Shift" }, { key: "reason", label: "Reason" },
-            ], exportRows)}>
+            <Button variant="outline" disabled={!rows.length} onClick={() => exportFilteredCsv({
+              baseName: "leave-records",
+              columns: [
+                { key: "empId", label: "Employee ID" }, { key: "name", label: "Name" }, { key: "type", label: "Type" },
+                { key: "from", label: "From" }, { key: "to", label: "To" }, { key: "duration", label: "Duration" },
+                { key: "shift", label: "Shift" }, { key: "reason", label: "Reason" },
+              ],
+              rows: exportRows,
+              isFiltered: !!term.trim(),
+              noun: "leave records",
+            })}>
               <Icon name="download" size={16} /> Export
             </Button>
             <Link className="btn btn--primary" to="/apply/leave"><Icon name="plus" size={16} /> Apply Leave</Link>

@@ -23,7 +23,7 @@ import {
   shiftShort,
 } from "../utils/constants";
 import { formatDateLocal } from "../utils/date";
-import { downloadCsv } from "../utils/csv";
+import { exportFilteredCsv } from "../utils/exportCsv";
 
 const PAGE_SIZES = [20, 50, 100];
 
@@ -84,11 +84,17 @@ export default function Roster() {
   const onPageSize = (n) => { setPageSize(n); setPage(1); };
   const clearAll = () => { setTerm(""); setSearch(""); setShiftFilter(""); setDeptFilter(""); setPage(1); };
 
-  // Export pulls the FULL roster (all pages) so the CSV is complete.
+  // Export respects the active filters (search/shift/department) and spans ALL
+  // pages — fetched in one request with the same filters as the table.
+  const isFiltered = !!(search || shiftFilter || deptFilter);
   const exportCsv = async () => {
     setExporting(true);
     try {
-      const all = await rosterService.list();
+      const all = await rosterService.listAllFiltered({
+        search,
+        shift: shiftFilter,
+        department: deptFilter,
+      });
       const cols = [
         { key: "empId", label: "Employee ID" }, { key: "empName", label: "Name" },
         { key: "mobileNo", label: "Mobile No" }, { key: "department", label: "Department" },
@@ -102,7 +108,13 @@ export default function Roster() {
         from: r.shiftFromDate ? formatDateLocal(r.shiftFromDate) : "",
         to: r.shiftToDate ? formatDateLocal(r.shiftToDate) : "",
       }));
-      downloadCsv("roster.csv", cols, rows);
+      exportFilteredCsv({
+        baseName: "security-roster",
+        columns: cols,
+        rows,
+        isFiltered,
+        noun: "roster records",
+      });
     } catch {
       toast.error("Could not export the roster.");
     } finally {

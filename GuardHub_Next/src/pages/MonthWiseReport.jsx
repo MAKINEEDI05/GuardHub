@@ -17,7 +17,7 @@ import {
   isFutureYmd,
   FUTURE_DATE_MESSAGE,
 } from "../utils/date";
-import { downloadCsv } from "../utils/csv";
+import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Month Wise Report — all employees by default, search just filters the table.
 // Attendance is computed server-side in ONE call (/month/monthwise-summary):
@@ -105,7 +105,13 @@ export default function MonthWiseReport() {
 
   const exportCsv = () => {
     if (!filtered.length) return;
-    downloadCsv(`monthwise-${range.start}_to_${range.end}.csv`, CSV_COLUMNS, filtered);
+    exportFilteredCsv({
+      baseName: `month-wise-${range.start}_to_${range.end}`,
+      columns: CSV_COLUMNS,
+      rows: filtered,
+      isFiltered: !!term.trim(),
+      noun: "employees",
+    });
   };
 
   const columns = [

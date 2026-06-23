@@ -13,7 +13,7 @@ import { useOts, useDeleteOt, useUpdateOt } from "../hooks/useOts";
 import { useEmployees } from "../hooks/useEmployees";
 import { OT_STATUSES } from "../utils/constants";
 import { formatDate } from "../utils/date";
-import { downloadCsv } from "../utils/csv";
+import { exportFilteredCsv } from "../utils/exportCsv";
 
 function statusTone(s) {
   const v = String(s).toLowerCase();
@@ -103,12 +103,18 @@ export default function ViewOt() {
         subtitle={`${ots.length} overtime requests`}
         actions={
           <>
-            <Button variant="outline" disabled={!rows.length} onClick={() => downloadCsv("ot-records.csv", [
-              { key: "employeeId", label: "Employee ID" }, { key: "employeeName", label: "Name" },
-              { key: "currentShift", label: "Current Shift" }, { key: "additionalShift", label: "Additional Shift" },
-              { key: "workingDuration", label: "Duration" }, { key: "from", label: "From" }, { key: "to", label: "To" },
-              { key: "location", label: "Location" }, { key: "reason", label: "Reason" }, { key: "status", label: "Status" },
-            ], exportRows)}>
+            <Button variant="outline" disabled={!rows.length} onClick={() => exportFilteredCsv({
+              baseName: "ot-records",
+              columns: [
+                { key: "employeeId", label: "Employee ID" }, { key: "employeeName", label: "Name" },
+                { key: "currentShift", label: "Current Shift" }, { key: "additionalShift", label: "Additional Shift" },
+                { key: "workingDuration", label: "Duration" }, { key: "from", label: "From" }, { key: "to", label: "To" },
+                { key: "location", label: "Location" }, { key: "reason", label: "Reason" }, { key: "status", label: "Status" },
+              ],
+              rows: exportRows,
+              isFiltered: !!term.trim(),
+              noun: "OT records",
+            })}>
               <Icon name="download" size={16} /> Export
             </Button>
             <Link className="btn btn--primary" to="/apply/ot"><Icon name="plus" size={16} /> Apply OT</Link>

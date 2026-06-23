@@ -13,7 +13,7 @@ import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useAttendanceByDate } from "../hooks/useReports";
 import { useEmployees } from "../hooks/useEmployees";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
-import { downloadCsv } from "../utils/csv";
+import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date —
 // the PROCESSED `empAttendance` collection (one row per employee per day),
@@ -134,8 +134,16 @@ export default function DayWiseReport() {
           <div className="dw-toolbar__action">
             <Button
               variant="outline"
-              disabled={!rows.length}
-              onClick={() => downloadCsv(`attendance-${date}.csv`, CSV_COLUMNS, rows)}
+              disabled={!filtered.length}
+              onClick={() =>
+                exportFilteredCsv({
+                  baseName: `day-wise-${date}`,
+                  columns: CSV_COLUMNS,
+                  rows: filtered,
+                  isFiltered: !!term.trim(),
+                  noun: "records",
+                })
+              }
             >
               <Icon name="download" size={16} /> Export CSV
             </Button>
