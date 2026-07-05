@@ -20,9 +20,17 @@ export const NAV_SECTIONS = [
     ],
   },
   {
+    title: "Leave Management",
+    items: [
+      { to: "/leaves", label: "Leave Records", icon: "leave" },
+      { to: "/leaves/balances", label: "Leave Balances", icon: "calendar-month" },
+      { to: "/leaves/report", label: "Leave Report", icon: "download" },
+      { to: "/leaves/types", label: "Leave Types", icon: "dashboard" },
+    ],
+  },
+  {
     title: "Records",
     items: [
-      { to: "/leaves", label: "View Leaves", icon: "leave" },
       { to: "/od", label: "View OD", icon: "od" },
       { to: "/ot", label: "View OT", icon: "ot" },
     ],

@@ -1,8 +1,21 @@
 // Option sets used across forms. These mirror exactly what the backend
 // validates/accepts — do not change casing without checking the controllers.
 
-// Leave types (free strings on the backend; these are the app's canonical set).
+// Leave types (legacy fallback list). Leave Management v2 loads the real,
+// configurable set from the backend leave_types master via useLeaveTypes().
 export const LEAVE_TYPES = ["Casual Leave", "Sick Leave", "Earned Leave"];
+
+// Month options for report/balance filters ({ value: 1..12, label }).
+export const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December",
+].map((label, i) => ({ value: i + 1, label }));
+
+// Years selectable in Leave screens: current year and the two prior.
+export function recentYears(count = 3) {
+  const now = new Date().getFullYear();
+  return Array.from({ length: count }, (_, i) => now - i);
+}
 
 // Shift types used by Leave/OD forms (empShiftType).
 export const SHIFT_TYPES = [

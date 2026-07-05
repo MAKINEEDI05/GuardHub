@@ -32,6 +32,11 @@ export const QK = {
     p.department || "",
   ],
   leavesRange: (from, to) => ["leaves", from, to],
+  // Leave Management v2
+  leaveTypes: ["leave-types"],
+  leaveBalances: (year, empId) => ["leave-balances", year, empId || "all"],
+  leaveTransactions: (filters = {}) => ["leave-transactions", filters],
+  leaveReport: (filters = {}) => ["leave-report", filters],
   odsRange: (from, to) => ["ods", from, to],
   ot: ["ot"],
   attendanceByDate: (date) => ["attendance", date],

@@ -26,12 +26,23 @@ export const ENDPOINTS = {
   monthwiseReport: (empId) => `/month/monthwise-report/${empId}`,
   monthwiseSummary: "/month/monthwise-summary", // ?startDate&endDate&empId&search&page&limit
 
-  // Leave — mounted at /leave
+  // Leave — mounted at /leave (legacy, still used by attendance/reports)
   applyLeave: "/leave/apply-leave",
   leavesByRange: "/leave/get-month-wise-leaves", // ?fromDate&toDate
   leaveByEmp: (empId) => `/leave/get-leave-byid/${empId}`,
   updateLeave: (id) => `/leave/update-leave-byid/${id}`,
   deleteLeave: (id) => `/leave/delete-leave-byid/${id}`,
+
+  // Leave Management v2 — mounted at /leave (additive)
+  leaveTypes: "/leave/types", // ?activeOnly=true ; POST create
+  leaveType: (id) => `/leave/types/${id}`, // PUT / DELETE(deactivate)
+  leaveBalances: "/leave/balances", // ?year&empId
+  leaveAllocate: "/leave/balances/allocate", // POST { year, allocations[], empIds? }
+  leaveTransactions: "/leave/transactions", // GET(filters) / POST record
+  leaveTransaction: (id) => `/leave/transactions/${id}`, // DELETE
+  leaveReport: "/leave/reports/summary", // ?empId&month&year&leaveTypeCode
+  leaveMonthlySummary: "/leave/summary/monthly", // salary-ready
+  leaveYearlySummary: "/leave/summary/yearly",
 
   // OD — mounted at /od
   applyOd: "/od/apply-od",

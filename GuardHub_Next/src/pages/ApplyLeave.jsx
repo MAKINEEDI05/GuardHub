@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import EmployeePicker from "../components/EmployeePicker";
@@ -7,33 +7,57 @@ import FormSection from "../components/forms/FormSection";
 import FormActions from "../components/forms/FormActions";
 import DateField from "../components/forms/DateField";
 import { Field, Select, Textarea } from "../components/ui/Field";
-import { useApplyLeave } from "../hooks/useLeaves";
-import { LEAVE_TYPES, SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
+import { useRecordLeave, useLeaveTypes, useLeaveBalances } from "../hooks/useLeaveV2";
+import { SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
 
-// Apply Leave: Search Employee → verify (left panel) → request details → reason
-// → submit. Payload exactly matches the backend leave schema (empId is Number).
-const INIT = { empLeaveType: "", empShiftType: "", empOdType: "", empFromDate: "", empToDate: "", empReason: "" };
+// Apply Leave (v2): pick employee → choose type/shift/duration/dates → reason →
+// submit. This records a leave TRANSACTION which auto-debits the balance and
+// mirrors a legacy leave_mgmt row (so attendance/reports keep working). The
+// panel shows the employee's remaining balance for the chosen type.
+const INIT = { leaveTypeCode: "", shiftType: "", dayType: "", fromDate: "", toDate: "", reason: "" };
+
+// Client mirror of utils/leaveDays.computeLeaveDays for a live preview only.
+function previewDays(from, to, dayType) {
+  if (!from || !to || to < from) return null;
+  const days = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
+  if (days === 1 && /HALF/i.test(dayType)) return 0.5;
+  return days;
+}
 
 export default function ApplyLeave() {
   const navigate = useNavigate();
   const [emp, setEmp] = useState(null);
   const [form, setForm] = useState(INIT);
   const [errors, setErrors] = useState({});
-  const apply = useApplyLeave();
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
+  const record = useRecordLeave();
+  const { data: types = [] } = useLeaveTypes(true);
 
+  const year = new Date().getFullYear();
+  const { data: bal } = useLeaveBalances(year, emp?.empId);
+
+  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
+
+  const days = previewDays(form.fromDate, form.toDate, form.dayType);
+
+  // Remaining for the chosen type (if the employee has a balance row this year).
+  const remaining = useMemo(() => {
+    if (!bal || !form.leaveTypeCode) return null;
+    const row = bal.data?.[0];
+    const t = row?.byType?.find((b) => b.leaveTypeCode === form.leaveTypeCode);
+    return t ? t.remaining : null;
+  }, [bal, form.leaveTypeCode]);
 
   const validate = () => {
     const errs = {};
     if (!emp) errs.emp = "Select an employee.";
-    if (!form.empLeaveType) errs.empLeaveType = "Required";
-    if (!form.empShiftType) errs.empShiftType = "Required";
-    if (!form.empOdType) errs.empOdType = "Required";
-    if (!form.empFromDate) errs.empFromDate = "Required";
-    if (!form.empToDate) errs.empToDate = "Required";
-    else if (form.empToDate < form.empFromDate) errs.empToDate = "To date must be after from date.";
-    if (!form.empReason.trim() || form.empReason.trim().length < 5) errs.empReason = "Enter a reason (min 5 chars).";
+    if (!form.leaveTypeCode) errs.leaveTypeCode = "Required";
+    if (!form.shiftType) errs.shiftType = "Required";
+    if (!form.dayType) errs.dayType = "Required";
+    if (!form.fromDate) errs.fromDate = "Required";
+    if (!form.toDate) errs.toDate = "Required";
+    else if (form.toDate < form.fromDate) errs.toDate = "To date must be on/after from date.";
+    if (!form.reason.trim() || form.reason.trim().length < 5) errs.reason = "Enter a reason (min 5 chars).";
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -42,14 +66,14 @@ export default function ApplyLeave() {
     e.preventDefault();
     if (!validate()) return;
     try {
-      await apply.mutateAsync({
+      await record.mutateAsync({
         empId: parseInt(emp.empId, 10),
-        empLeaveType: form.empLeaveType,
-        empShiftType: form.empShiftType,
-        empOdType: form.empOdType,
-        empFromDate: form.empFromDate,
-        empToDate: form.empToDate,
-        empReason: form.empReason.trim(),
+        leaveTypeCode: form.leaveTypeCode,
+        shiftType: form.shiftType,
+        dayType: form.dayType,
+        fromDate: form.fromDate,
+        toDate: form.toDate,
+        reason: form.reason.trim(),
       });
       reset();
       navigate("/leaves");
@@ -58,7 +82,7 @@ export default function ApplyLeave() {
 
   return (
     <>
-      <PageHeader title="Apply Leave" subtitle="Submit a leave request for an employee" />
+      <PageHeader title="Apply Leave" subtitle="Record a leave for an employee (updates their balance)" />
       <ApplyLayout
         onSubmit={onSubmit}
         aside={
@@ -66,39 +90,48 @@ export default function ApplyLeave() {
             <EmployeePicker selected={emp} onSelect={setEmp} />
             {errors.emp && <div className="field__error">{errors.emp}</div>}
             {!emp && <p className="muted text-sm" style={{ margin: "8px 0 0" }}>Select an employee to begin.</p>}
+            {emp && form.leaveTypeCode && (
+              <div className="card" style={{ marginTop: 12, padding: "10px 12px" }}>
+                <div className="text-sm muted">Remaining ({form.leaveTypeCode}) · {year}</div>
+                <div style={{ fontSize: 22, fontWeight: 700 }}>
+                  {remaining == null ? "—" : remaining}
+                  {days != null && remaining != null && (
+                    <span className="text-sm muted" style={{ fontWeight: 400 }}> → {remaining - days} after</span>
+                  )}
+                </div>
+              </div>
+            )}
           </FormSection>
         }
       >
         <FormSection title="Leave Details">
           <div className="field-grid-2">
-            <Field label="Leave Type" required error={errors.empLeaveType}>
-              <Select value={form.empLeaveType} onChange={set("empLeaveType")} options={LEAVE_TYPES} placeholder="Select type" />
+            <Field label="Leave Type" required error={errors.leaveTypeCode}>
+              <Select value={form.leaveTypeCode} onChange={set("leaveTypeCode")}
+                placeholder="Select type"
+                options={types.map((t) => ({ value: t.code, label: `${t.name}${t.isPaid ? "" : " (LOP)"}` }))} />
             </Field>
-            <Field label="Shift Type" required error={errors.empShiftType}>
-              <Select value={form.empShiftType} onChange={set("empShiftType")} options={SHIFT_TYPES} placeholder="Select shift" />
+            <Field label="Shift Type" required error={errors.shiftType}>
+              <Select value={form.shiftType} onChange={set("shiftType")} options={SHIFT_TYPES} placeholder="Select shift" />
             </Field>
-            <Field label="Duration" required error={errors.empOdType}>
-              <Select value={form.empOdType} onChange={set("empOdType")} options={DAY_TYPES} placeholder="Select duration" />
+            <Field label="Duration" required error={errors.dayType}>
+              <Select value={form.dayType} onChange={set("dayType")} options={DAY_TYPES} placeholder="Select duration" />
             </Field>
             <div />
-            <DateField label="From Date" required value={form.empFromDate} onChange={set("empFromDate")} error={errors.empFromDate} />
-            <DateField label="To Date" required value={form.empToDate} min={form.empFromDate} onChange={set("empToDate")} error={errors.empToDate} />
+            <DateField label="From Date" required value={form.fromDate} onChange={set("fromDate")} error={errors.fromDate} />
+            <DateField label="To Date" required value={form.toDate} min={form.fromDate} onChange={set("toDate")} error={errors.toDate} />
           </div>
+          {days != null && <p className="text-sm muted" style={{ margin: "4px 0 0" }}>This leave counts as <strong>{days}</strong> day(s).</p>}
         </FormSection>
 
         <FormSection title="Reason">
-          <Field required error={errors.empReason}>
-            <Textarea maxLength={225} value={form.empReason} onChange={set("empReason")} placeholder="Reason for leave" rows={4} />
+          <Field required error={errors.reason}>
+            <Textarea maxLength={225} value={form.reason} onChange={set("reason")} placeholder="Reason for leave" rows={4} />
           </Field>
         </FormSection>
 
         <FormSection title="Review & Submit">
-          <FormActions
-            onCancel={() => navigate("/leaves")}
-            onReset={reset}
-            submitLabel="Submit Leave"
-            loading={apply.isPending}
-          />
+          <FormActions onCancel={() => navigate("/leaves")} onReset={reset} submitLabel="Record Leave" loading={record.isPending} />
         </FormSection>
       </ApplyLayout>
     </>
