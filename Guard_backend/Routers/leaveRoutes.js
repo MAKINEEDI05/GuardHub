@@ -1,9 +1,9 @@
 const express = require("express");
 const router = express.Router();
 
+// --- Legacy leave endpoints (unchanged — kept for backward compatibility) ----
 const {
   addLeave,
-
   getLeaveByEmpId,
   deleteLeaveById,
   updateLeaveById,
@@ -11,12 +11,54 @@ const {
   getMonthwiseLeaves,
 } = require("../Controllers/leaveController");
 
-// Leave APIs
-router.post("/apply-leave", addLeave); // Add leave entry
-router.get("/get-month-wise-leaves", getMonthwiseLeaves); // Get  leaves
-router.get("/get-leave-byid/:empId", getLeaveByEmpId); // Get leaves by employee ID
-router.delete("/delete-leave-byid/:id", deleteLeaveById); // Delete leaves by  object id
-router.put("/update-leave-byid/:id", updateLeaveById); // Delete leaves by object id
+// --- Leave Management v2 controllers -----------------------------------------
+const {
+  listTypes,
+  createType,
+  updateType,
+  deleteType,
+} = require("../Controllers/leaveTypeController");
+const {
+  getBalances,
+  allocateBalances,
+} = require("../Controllers/leaveBalanceController");
+const {
+  recordLeave,
+  listTransactions,
+  deleteTransaction,
+} = require("../Controllers/leaveTransactionController");
+const {
+  getLeaveReport,
+  getMonthlySummary,
+  getYearlySummary,
+} = require("../Controllers/leaveReportController");
+
+// ---- Leave Types (configurable categories) ----
+router.get("/types", listTypes);
+router.post("/types", createType);
+router.put("/types/:id", updateType);
+router.delete("/types/:id", deleteType);
+
+// ---- Leave Balances (yearly allocation + remaining) ----
+router.get("/balances", getBalances);
+router.post("/balances/allocate", allocateBalances);
+
+// ---- Leave Transactions (record / history / delete) ----
+router.get("/transactions", listTransactions);
+router.post("/transactions", recordLeave);
+router.delete("/transactions/:id", deleteTransaction);
+
+// ---- Reports & salary-facing summaries ----
+router.get("/reports/summary", getLeaveReport);
+router.get("/summary/monthly", getMonthlySummary);
+router.get("/summary/yearly", getYearlySummary);
+
+// ---- Legacy leave APIs (still mounted so existing screens keep working) ----
+router.post("/apply-leave", addLeave);
+router.get("/get-month-wise-leaves", getMonthwiseLeaves);
+router.get("/get-leave-byid/:empId", getLeaveByEmpId);
+router.delete("/delete-leave-byid/:id", deleteLeaveById);
+router.put("/update-leave-byid/:id", updateLeaveById);
 router.get("/monthLeaves-report/:empId", getMonthwiseReport);
 
 module.exports = router;
