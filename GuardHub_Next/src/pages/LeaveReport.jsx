@@ -5,50 +5,64 @@ import DataTable from "../components/ui/DataTable";
 import Badge from "../components/ui/Badge";
 import Icon from "../components/ui/Icon";
 import EmployeePicker from "../components/EmployeePicker";
+import LeaveHistoryDrawer from "../components/leave/LeaveHistoryDrawer";
 import { Field, Select } from "../components/ui/Field";
 import { useLeaveReport, useLeaveTypes } from "../hooks/useLeaveV2";
-import { MONTHS, recentYears } from "../utils/constants";
+import { MONTHS, recentYears, DEPARTMENTS, DESIGNATIONS } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
-// Leave Report — filter by employee / month / year / type, view Allocated /
-// Used / Remaining alongside Leave Taken for the period, export to CSV. The
-// exported columns match exactly what the table shows (filtered set).
+// Leave Report — filter by employee / department / designation / month / year /
+// type (all applied server-side), view Allocated / Used / Remaining alongside
+// Leave Taken, drill into any employee's full history, and export exactly the
+// filtered rows to CSV.
 export default function LeaveReport() {
   const years = recentYears();
   const { data: types = [] } = useLeaveTypes(false);
 
   const [emp, setEmp] = useState(null);
+  const [department, setDepartment] = useState("");
+  const [designation, setDesignation] = useState("");
   const [month, setMonth] = useState("");
   const [year, setYear] = useState(years[0]);
   const [typeCode, setTypeCode] = useState("");
+  const [viewEmp, setViewEmp] = useState(null); // drill-down target
 
   const filters = useMemo(() => ({
     year,
     ...(emp ? { empId: emp.empId } : {}),
+    ...(department ? { department } : {}),
+    ...(designation ? { designation } : {}),
     ...(month ? { month } : {}),
     ...(typeCode ? { leaveTypeCode: typeCode } : {}),
-  }), [emp, month, year, typeCode]);
+  }), [emp, department, designation, month, year, typeCode]);
 
   const { data = { data: [], summary: {} }, isLoading } = useLeaveReport(filters);
   const rows = data.data;
   const s = data.summary || {};
 
-  const isFiltered = !!(emp || month || typeCode);
+  const isFiltered = !!(emp || department || designation || month || typeCode);
 
   const columns = [
     { key: "empName", header: "Employee", sortable: true, render: (r) => (
       <div><div style={{ fontWeight: 600 }}>{r.empName}</div><div className="text-sm muted">ID {r.empId}</div></div>
     ) },
+    { key: "empDepartment", header: "Department", render: (r) => r.empDepartment || "—" },
     { key: "leaveTypeName", header: "Leave Type", render: (r) => <Badge status="leave">{r.leaveTypeName}</Badge> },
     { key: "leaveTaken", header: "Leave Taken", className: "num", sortable: true, render: (r) => r.leaveTaken },
     { key: "allocated", header: "Allocated", className: "num", render: (r) => r.allocated },
     { key: "used", header: "Used", className: "num", render: (r) => r.used },
     { key: "remaining", header: "Remaining", className: "num", render: (r) => <strong>{r.remaining}</strong> },
+    { key: "_view", header: "", className: "num", render: (r) => (
+      <button className="btn btn--ghost btn--icon" title="View leave history" aria-label={`View ${r.empName}'s leave history`}
+        onClick={() => setViewEmp({ empId: r.empId, empName: r.empName, empDepartment: r.empDepartment, empDesignation: r.empDesignation })}>
+        <Icon name="eye" size={16} />
+      </button>
+    ) },
   ];
 
   const exportRows = rows.map((r) => ({
-    name: r.empName, empId: r.empId, taken: r.leaveTaken, type: r.leaveTypeName,
-    allocated: r.allocated, used: r.used, remaining: r.remaining,
+    name: r.empName, empId: r.empId, department: r.empDepartment, taken: r.leaveTaken,
+    type: r.leaveTypeName, allocated: r.allocated, used: r.used, remaining: r.remaining,
   }));
 
   const monthLabel = month ? MONTHS.find((m) => m.value === Number(month))?.label : "All months";
@@ -57,12 +71,13 @@ export default function LeaveReport() {
     <>
       <PageHeader
         title="Leave Report"
-        subtitle={`${monthLabel} · ${year}${emp ? ` · ${emp.empName}` : ""}`}
+        subtitle={`${monthLabel} · ${year}${emp ? ` · ${emp.empName}` : ""}${department ? ` · ${department}` : ""}${designation ? ` · ${designation}` : ""}`}
         actions={
           <Button variant="outline" disabled={!rows.length} onClick={() => exportFilteredCsv({
             baseName: `leave-report-${year}${month ? `-${month}` : ""}`,
             columns: [
               { key: "name", label: "Employee Name" }, { key: "empId", label: "Employee ID" },
+              { key: "department", label: "Department" },
               { key: "taken", label: "Leave Taken" }, { key: "type", label: "Leave Type" },
               { key: "allocated", label: "Allocated Leave" }, { key: "used", label: "Used Leave" },
               { key: "remaining", label: "Remaining Leave" },
@@ -81,6 +96,14 @@ export default function LeaveReport() {
             {emp && <button className="btn btn--ghost btn--sm" style={{ marginTop: 6 }} onClick={() => setEmp(null)}>Clear employee</button>}
           </Field>
           <div className="field-grid-2" style={{ gap: 12 }}>
+            <Field label="Department">
+              <Select value={department} onChange={(e) => setDepartment(e.target.value)}
+                placeholder="All departments" options={DEPARTMENTS} />
+            </Field>
+            <Field label="Designation">
+              <Select value={designation} onChange={(e) => setDesignation(e.target.value)}
+                placeholder="All designations" options={DESIGNATIONS} />
+            </Field>
             <Field label="Year">
               <Select value={year} onChange={(e) => setYear(Number(e.target.value))}
                 options={years.map((y) => ({ value: y, label: String(y) }))} />
@@ -107,6 +130,8 @@ export default function LeaveReport() {
 
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15}
         emptyTitle="No leave in this period" emptyIcon="🌴" rowKey={(r) => `${r.empId}-${r.leaveTypeCode}`} />
+
+      <LeaveHistoryDrawer emp={viewEmp} year={year} onClose={() => setViewEmp(null)} />
     </>
   );
 }
