@@ -50,11 +50,12 @@ export function useDeleteLeaveType() {
 }
 
 /* ---- Balances ---- */
-export function useLeaveBalances(year, empId) {
+export function useLeaveBalances(year, empId, opts = {}) {
   return useQuery({
     queryKey: QK.leaveBalances(year, empId),
     queryFn: () => leaveBalanceService.list(year, empId),
     placeholderData: keepPreviousData,
+    ...opts,
   });
 }
 export function useAllocateLeave() {
@@ -70,11 +71,12 @@ export function useAllocateLeave() {
 }
 
 /* ---- Transactions ---- */
-export function useLeaveTransactions(filters = {}) {
+export function useLeaveTransactions(filters = {}, opts = {}) {
   return useQuery({
     queryKey: QK.leaveTransactions(filters),
     queryFn: () => leaveTxnService.list(filters),
     placeholderData: keepPreviousData,
+    ...opts,
   });
 }
 export function useRecordLeave() {
@@ -106,5 +108,14 @@ export function useLeaveReport(filters = {}) {
     queryKey: QK.leaveReport(filters),
     queryFn: () => leaveReportService.summary(filters),
     placeholderData: keepPreviousData,
+  });
+}
+
+/* ---- Dashboard overview (on-leave-today + low-balance) ---- */
+export function useLeaveDashboardOverview(year, threshold) {
+  return useQuery({
+    queryKey: QK.leaveDashboard(year, threshold),
+    queryFn: () => leaveReportService.dashboardOverview(year, threshold),
+    staleTime: 60_000,
   });
 }

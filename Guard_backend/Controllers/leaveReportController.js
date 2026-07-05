@@ -3,6 +3,21 @@ const LeaveBalance = require("../models/leaveBalanceScheme");
 const LeaveType = require("../models/leaveTypeScheme");
 const employe = require("../models/profileScheme");
 const { ACTIVE_FILTER } = require("../utils/employeeRef");
+const { buildYearRows } = require("./leaveBalanceController");
+
+// Active-employee filter with optional department / designation narrowing.
+// Values are matched case-insensitively against the (curated) master values so
+// the report can restrict rows to a department/designation on the SERVER — the
+// report only ever emits rows for employees this query returns.
+function employeeScopeFilter(query) {
+  const f = { ...ACTIVE_FILTER };
+  const exactCI = (v) => new RegExp(`^${String(v).trim().replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}$`, "i");
+  if (query.department && String(query.department).trim())
+    f.empDepartment = exactCI(query.department);
+  if (query.designation && String(query.designation).trim())
+    f.empDesignation = exactCI(query.designation);
+  return f;
+}
 
 // Build the transaction filter shared by the report + stats endpoints.
 function txnFilter(query) {
@@ -14,16 +29,17 @@ function txnFilter(query) {
   return f;
 }
 
-// GET /leave/reports/summary?empId&month&year&leaveTypeCode
+// GET /leave/reports/summary?empId&month&year&leaveTypeCode&department&designation
 // One row per (employee, leave type): Leave Taken (over the filtered period) +
-// the year's Allocated / Used / Remaining. Powers the CSV export.
+// the year's Allocated / Used / Remaining. Department/Designation narrow the
+// employee scope server-side. Powers the CSV export.
 const getLeaveReport = async (req, res) => {
   try {
     const year = parseInt(req.query.year, 10) || new Date().getFullYear();
     const filter = { ...txnFilter(req.query), year };
 
     const [employees, txns, balances, types] = await Promise.all([
-      employe.find(ACTIVE_FILTER, { empId: 1, empName: 1, empDesignation: 1, empDepartment: 1 }).lean(),
+      employe.find(employeeScopeFilter(req.query), { empId: 1, empName: 1, empDesignation: 1, empDepartment: 1 }).lean(),
       LeaveTransaction.aggregate([
         { $match: filter },
         { $group: { _id: { empId: "$empId", code: "$leaveTypeCode" }, taken: { $sum: "$days" } } },
@@ -50,6 +66,7 @@ const getLeaveReport = async (req, res) => {
           empId: t._id.empId,
           empName: emp.empName || `ID ${t._id.empId}`,
           empDepartment: emp.empDepartment || "",
+          empDesignation: emp.empDesignation || "",
           leaveTypeCode: t._id.code,
           leaveTypeName: nameByCode.get(t._id.code) || t._id.code,
           leaveTaken: t.taken,
@@ -176,4 +193,88 @@ const getYearlySummary = async (req, res) => {
   }
 };
 
-module.exports = { getLeaveReport, getMonthlySummary, getYearlySummary };
+// GET /leave/dashboard-overview?year&threshold
+// Powers the two dashboard widgets in one round-trip, reusing existing calcs:
+//   onLeaveToday – transactions whose [fromDate,toDate] covers today, joined to
+//                  the active employee master (+ expected return = day after).
+//   lowBalance   – flattened from buildYearRows() (the SAME balance calculation
+//                  the Balances screen uses) where remaining <= threshold.
+// `threshold` is supplied by the caller (frontend constant); defaults to 2.
+const getDashboardOverview = async (req, res) => {
+  try {
+    const year = parseInt(req.query.year, 10) || new Date().getFullYear();
+    const threshold = req.query.threshold !== undefined ? Number(req.query.threshold) : 2;
+
+    // Today's UTC day window (dates are stored at UTC midnight).
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    const todayEnd = new Date(todayStart.getTime() + 24 * 60 * 60 * 1000 - 1);
+
+    const [employees, covering, yearRows] = await Promise.all([
+      employe.find(ACTIVE_FILTER, { empId: 1, empName: 1, empDepartment: 1, empDesignation: 1 }).lean(),
+      LeaveTransaction.find({
+        fromDate: { $lte: todayEnd },
+        toDate: { $gte: todayStart },
+      }).sort({ fromDate: -1 }).lean(),
+      buildYearRows(year), // reuse the balance ledger builder
+    ]);
+
+    const empMap = new Map(employees.map((e) => [e.empId, e]));
+    const activeIds = new Set(employees.map((e) => e.empId));
+
+    const onLeaveToday = covering
+      .filter((t) => activeIds.has(t.empId))
+      .map((t) => {
+        const emp = empMap.get(t.empId) || {};
+        const ret = new Date(new Date(t.toDate).getTime() + 24 * 60 * 60 * 1000);
+        return {
+          empId: t.empId,
+          empName: emp.empName || `ID ${t.empId}`,
+          empDepartment: emp.empDepartment || "",
+          leaveTypeName: t.leaveTypeName || t.leaveTypeCode,
+          duration: t.dayType || "FULL DAY",
+          days: t.days,
+          fromDate: t.fromDate,
+          toDate: t.toDate,
+          expectedReturn: ret,
+        };
+      });
+
+    // Flatten buildYearRows -> one entry per (employee, type) below threshold.
+    const lowBalance = [];
+    yearRows.forEach((r) => {
+      r.byType.forEach((b) => {
+        if (b.allocated > 0 && b.remaining <= threshold) {
+          lowBalance.push({
+            empId: r.empId,
+            empName: r.empName,
+            empDepartment: r.empDepartment || "",
+            leaveTypeCode: b.leaveTypeCode,
+            leaveTypeName: b.leaveTypeName,
+            remaining: b.remaining,
+          });
+        }
+      });
+    });
+    lowBalance.sort((a, b) => a.remaining - b.remaining || a.empId - b.empId);
+
+    return res.status(200).json({
+      year,
+      threshold,
+      onLeaveToday,
+      onLeaveTodayCount: onLeaveToday.length,
+      lowBalance,
+      lowBalanceCount: lowBalance.length,
+    });
+  } catch (error) {
+    console.error("Error building dashboard overview:", error);
+    return res.status(500).json({ message: "Failed to build dashboard overview" });
+  }
+};
+
+module.exports = {
+  getLeaveReport,
+  getMonthlySummary,
+  getYearlySummary,
+  getDashboardOverview,
+};
