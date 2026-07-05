@@ -1,0 +1,7 @@
+Employee Name,Employee ID,Leave Taken,Leave Type,Allocated Leave,Used Leave,Remaining Leave
+Anil Kumar,5122,3,Casual Leave,12,9,3
+Anil Kumar,5122,1,Sick Leave,6,1,5
+Ravi Teja,5157,2,Casual Leave,12,2,10
+Ravi Teja,5157,4,Summer Leave,4,4,0
+Suresh Babu,5297,0.5,Casual Leave,12,6.5,5.5
+Lakshmi Devi,5353,2,Special Leave,6,2,4
