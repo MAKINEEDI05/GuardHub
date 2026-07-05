@@ -71,6 +71,18 @@ export const leaveReportService = {
     });
     return Array.isArray(data?.data) ? data.data : [];
   },
+  // -> { onLeaveToday:[...], onLeaveTodayCount, lowBalance:[...], lowBalanceCount }
+  async dashboardOverview(year, threshold) {
+    const { data } = await apiClient.get(ENDPOINTS.leaveDashboardOverview, {
+      params: clean({ year, threshold }),
+    });
+    return {
+      onLeaveToday: Array.isArray(data?.onLeaveToday) ? data.onLeaveToday : [],
+      onLeaveTodayCount: data?.onLeaveTodayCount || 0,
+      lowBalance: Array.isArray(data?.lowBalance) ? data.lowBalance : [],
+      lowBalanceCount: data?.lowBalanceCount || 0,
+    };
+  },
 };
 
 // Drop empty/blank params so a cleared filter doesn't send "".

@@ -40,9 +40,10 @@ export const ENDPOINTS = {
   leaveAllocate: "/leave/balances/allocate", // POST { year, allocations[], empIds? }
   leaveTransactions: "/leave/transactions", // GET(filters) / POST record
   leaveTransaction: (id) => `/leave/transactions/${id}`, // DELETE
-  leaveReport: "/leave/reports/summary", // ?empId&month&year&leaveTypeCode
+  leaveReport: "/leave/reports/summary", // ?empId&month&year&leaveTypeCode&department&designation
   leaveMonthlySummary: "/leave/summary/monthly", // salary-ready
   leaveYearlySummary: "/leave/summary/yearly",
+  leaveDashboardOverview: "/leave/dashboard-overview", // ?year&threshold — on-leave-today + low-balance
 
   // OD — mounted at /od
   applyOd: "/od/apply-od",

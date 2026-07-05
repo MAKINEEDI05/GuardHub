@@ -31,6 +31,7 @@ const {
   getLeaveReport,
   getMonthlySummary,
   getYearlySummary,
+  getDashboardOverview,
 } = require("../Controllers/leaveReportController");
 
 // ---- Leave Types (configurable categories) ----
@@ -52,6 +53,7 @@ router.delete("/transactions/:id", deleteTransaction);
 router.get("/reports/summary", getLeaveReport);
 router.get("/summary/monthly", getMonthlySummary);
 router.get("/summary/yearly", getYearlySummary);
+router.get("/dashboard-overview", getDashboardOverview);
 
 // ---- Legacy leave APIs (still mounted so existing screens keep working) ----
 router.post("/apply-leave", addLeave);

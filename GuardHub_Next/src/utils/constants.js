@@ -17,6 +17,11 @@ export function recentYears(count = 3) {
   return Array.from({ length: count }, (_, i) => now - i);
 }
 
+// Dashboard "Low Leave Balance" widget: an employee/leave-type is flagged when
+// remaining leave is at or below this threshold. Configurable here (not inside
+// components) so the policy can change in one place.
+export const LOW_LEAVE_BALANCE_THRESHOLD = 2;
+
 // Shift types used by Leave/OD forms (empShiftType).
 export const SHIFT_TYPES = [
   "General",
