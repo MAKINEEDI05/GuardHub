@@ -7,6 +7,7 @@ import { EmptyState } from "../ui/States";
 import LeaveEditDrawer from "./LeaveEditDrawer";
 import { useLeaveTransactions, useDeleteLeaveTxn } from "../../hooks/useLeaveV2";
 import { formatDate, formatDateTime } from "../../utils/date";
+import { buildLeaveDetail } from "../../utils/leaveDetail";
 
 // Unified Employee Leave details drawer. EVERYTHING here respects the currently
 // applied filters: the summary + balance-by-type come from the (already filtered)
@@ -26,7 +27,10 @@ export default function LeaveDetailsDrawer({ emp, filters = {}, onClose }) {
     { ...filters, empId },
     { enabled: open }
   );
-  const rows = [...history].sort((a, b) => new Date(b.fromDate) - new Date(a.fromDate));
+  // Shape via the shared formatter so the drawer and the CSV export render the
+  // exact same summary / balance-by-type / history.
+  const detail = buildLeaveDetail(emp, history, filters?.year);
+  const rows = detail.history;
 
   return (
     <>
@@ -45,9 +49,9 @@ export default function LeaveDetailsDrawer({ emp, filters = {}, onClose }) {
 
             {/* Overall Summary (filtered) */}
             <section style={{ display: "grid", gridTemplateColumns: "repeat(3,1fr)", gap: 10, marginBottom: 16 }}>
-              <Tile label="Allocated" value={emp.allocated} />
-              <Tile label="Used" value={emp.taken} />
-              <Tile label="Remaining" value={emp.remaining} strong />
+              <Tile label="Allocated" value={detail.summary.allocated} />
+              <Tile label="Used" value={detail.summary.used} />
+              <Tile label="Remaining" value={detail.summary.remaining} strong />
             </section>
 
             {/* Leave Balance by Type (filtered) */}
@@ -56,8 +60,8 @@ export default function LeaveDetailsDrawer({ emp, filters = {}, onClose }) {
               <table className="table table--compact">
                 <thead><tr><th>Type</th><th className="num">Allocated</th><th className="num">Used</th><th className="num">Remaining</th></tr></thead>
                 <tbody>
-                  {(emp.byType || []).length === 0 && <tr><td colSpan={4} className="muted">No leave types.</td></tr>}
-                  {(emp.byType || []).map((b) => (
+                  {detail.byType.length === 0 && <tr><td colSpan={4} className="muted">No leave types.</td></tr>}
+                  {detail.byType.map((b) => (
                     <tr key={b.leaveTypeCode}>
                       <td>{b.leaveTypeName}</td>
                       <td className="num">{b.allocated}</td>

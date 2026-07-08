@@ -10,11 +10,12 @@ import { ErrorState } from "../components/ui/States";
 import DateField from "../components/forms/DateField";
 import EmployeePicker from "../components/EmployeePicker";
 import LeaveDetailsDrawer from "../components/leave/LeaveDetailsDrawer";
-import { useLeaveManage, useLeaveTypes } from "../hooks/useLeaveV2";
+import { useLeaveManage, useLeaveTypes, useLeaveTransactions } from "../hooks/useLeaveV2";
 import { leaveTxnService } from "../services/leaveV2Service";
 import { toast } from "../store/toastStore";
 import { MONTHS, recentYears, DEPARTMENTS, DESIGNATIONS } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
+import { buildLeaveDetail, exportLeaveDetailCsv } from "../utils/leaveDetail";
 
 // Unified Employee Leave Management — the single place to search, review and
 // manage every employee's leave. Filters are applied on the SERVER; the summary
@@ -54,6 +55,34 @@ export default function LeaveManagement() {
 
   const isFiltered = !!(applied.empId || applied.fromDate || applied.toDate ||
     applied.department || applied.designation || applied.month || applied.leaveTypeCode);
+
+  // Detailed export applies to exactly ONE employee: the open drawer's employee,
+  // or the single row a filter narrowed to. Its history is fetched with the SAME
+  // hook the drawer uses (same query key => shared cache, no extra query).
+  const detailEmp = viewEmp || (rows.length === 1 ? rows[0] : null);
+  const { data: detailHistory = [] } = useLeaveTransactions(
+    { ...activeFilters, empId: detailEmp?.empId },
+    { enabled: !!detailEmp }
+  );
+
+  const onExport = () => {
+    if (detailEmp) {
+      // Single employee -> full drawer report (info + summary + by-type + history).
+      exportLeaveDetailCsv(buildLeaveDetail(detailEmp, detailHistory, applied.year));
+      return;
+    }
+    // 0 or many employees -> the filtered summary table, exactly as shown.
+    exportFilteredCsv({
+      baseName: `leave-management-${applied.year}`,
+      columns: [
+        { key: "name", label: "Employee Name" }, { key: "empId", label: "Employee ID" },
+        { key: "department", label: "Department" }, { key: "designation", label: "Designation" },
+        { key: "allocated", label: "Allocated Leave" }, { key: "taken", label: "Leave Taken" },
+        { key: "remaining", label: "Remaining Leave" },
+      ],
+      rows: exportRows, isFiltered, noun: "employees",
+    });
+  };
 
   const onSearch = () => setApplied(draft);
   const onReset = () => { const d = emptyDraft(years[0]); setDraft(d); setApplied(d); };
@@ -113,16 +142,7 @@ export default function LeaveManagement() {
         title="Leave Management"
         subtitle={`${totals.employees ?? 0} employees · ${totals.taken ?? 0} days taken · ${applied.year}`}
         actions={
-          <Button variant="outline" disabled={!rows.length} onClick={() => exportFilteredCsv({
-            baseName: `leave-management-${applied.year}`,
-            columns: [
-              { key: "name", label: "Employee Name" }, { key: "empId", label: "Employee ID" },
-              { key: "department", label: "Department" }, { key: "designation", label: "Designation" },
-              { key: "allocated", label: "Allocated Leave" }, { key: "taken", label: "Leave Taken" },
-              { key: "remaining", label: "Remaining Leave" },
-            ],
-            rows: exportRows, isFiltered, noun: "employees",
-          })}>
+          <Button variant="outline" disabled={!rows.length} onClick={onExport}>
             <Icon name="download" size={16} /> Export CSV
           </Button>
         }
