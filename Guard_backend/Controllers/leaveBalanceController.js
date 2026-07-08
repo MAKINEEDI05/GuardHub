@@ -63,21 +63,22 @@ async function buildYearRows(year, empIdFilter) {
   return list
     .map((e) => {
       const typesObj = balMap.get(e.empId) || {};
-      const byType = types
-        .map((t) => {
-          const b = bucket(typesObj, t.code);
-          const allocated = b.allocated || 0;
-          const used = b.used || 0;
-          return {
-            leaveTypeCode: t.code,
-            leaveTypeName: t.name,
-            allocated,
-            used,
-            remaining: allocated - used,
-          };
-        })
-        // keep only types that are actually in play for this employee/year
-        .filter((r) => r.allocated > 0 || r.used > 0);
+      // Include EVERY active leave type (even with 0 allocation) so the UI shows
+      // "0" rather than "—"/blank for a type the employee hasn't been allocated
+      // yet. Consumers that only care about real allocations (e.g. the dashboard
+      // low-balance widget) filter on allocated > 0 themselves.
+      const byType = types.map((t) => {
+        const b = bucket(typesObj, t.code);
+        const allocated = b.allocated || 0;
+        const used = b.used || 0;
+        return {
+          leaveTypeCode: t.code,
+          leaveTypeName: t.name,
+          allocated,
+          used,
+          remaining: allocated - used,
+        };
+      });
       const totals = byType.reduce(
         (a, r) => ({
           allocated: a.allocated + r.allocated,

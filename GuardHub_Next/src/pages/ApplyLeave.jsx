@@ -33,7 +33,7 @@ export default function ApplyLeave() {
   const { data: types = [] } = useLeaveTypes(true);
 
   const year = new Date().getFullYear();
-  const { data: bal } = useLeaveBalances(year, emp?.empId);
+  const { data: bal } = useLeaveBalances(year, emp?.empId, { enabled: !!emp?.empId });
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
