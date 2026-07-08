@@ -11,8 +11,8 @@ import { toast } from "../store/toastStore";
 
 // Attendance Muster Roll — traditional register: one row per employee, one cell
 // per day of the month, plus the monthly summary. All filtering + the per-day
-// grid come from the backend (shared attendanceSummaryService). Supports CSV +
-// print. Day columns are generated dynamically from the month length.
+// grid come from the backend (shared attendanceSummaryService). Supports CSV
+// export. Day columns are generated dynamically from the month length.
 const SUMMARY_COLS = [
   { key: "present", label: "Present" },
   { key: "absent", label: "Absent" },
@@ -89,15 +89,12 @@ export default function AttendanceMusterRoll() {
         title="Attendance Muster Roll"
         subtitle={`${monthName} ${applied.year}${applied.department ? ` · ${applied.department}` : ""}${applied.designation ? ` · ${applied.designation}` : ""}`}
         actions={
-          <>
-            <Button variant="outline" disabled={!rows.length} onClick={exportCsv}><Icon name="download" size={16} /> Export CSV</Button>
-            <Button variant="outline" disabled={!rows.length} onClick={() => window.print()}><Icon name="calendar-day" size={16} /> Print</Button>
-          </>
+          <Button variant="outline" disabled={!rows.length} onClick={exportCsv}><Icon name="download" size={16} /> Export CSV</Button>
         }
       />
 
       {/* Filters */}
-      <div className="card no-print" style={{ padding: 16, marginBottom: 16 }}>
+      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
         <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 12 }}>
           <Field label="Month">
             <Select value={draft.month} onChange={(e) => setDraft((d) => ({ ...d, month: Number(e.target.value) }))} options={MONTHS} />
@@ -126,23 +123,12 @@ export default function AttendanceMusterRoll() {
         </div>
       </div>
 
-      {/* Print-only header */}
-      <div className="print-only muster-print-head">
-        <h2>Attendance Muster Roll</h2>
-        <div>{monthName} {applied.year}
-          {applied.department ? ` · Department: ${applied.department}` : ""}
-          {applied.designation ? ` · Designation: ${applied.designation}` : ""}
-          {applied.shift ? ` · Shift: ${applied.shift}` : ""}
-        </div>
-        <div className="muster-print-ts">Printed: {new Date().toLocaleString()}</div>
-      </div>
-
-      <div className="text-sm muted no-print" style={{ marginBottom: 8 }}>{LEGEND}</div>
+      <div className="text-sm muted" style={{ marginBottom: 8 }}>{LEGEND}</div>
 
       {isError ? (
         <div className="card"><ErrorState message="Failed to load the muster roll." /></div>
       ) : (
-        <div className="card muster-print-area" style={{ padding: 0, overflow: "hidden" }}>
+        <div className="card" style={{ padding: 0, overflow: "hidden" }}>
           <div className="mr-scroll">
             <table className="mr-table">
               <thead>
@@ -190,7 +176,7 @@ export default function AttendanceMusterRoll() {
 }
 
 // Scoped styles: sticky employee (left) + summary (right) columns, compact grid,
-// status tints, and a print-friendly landscape layout.
+// and status tints.
 const MUSTER_CSS = `
 .mr-scroll { overflow-x: auto; }
 .mr-table { border-collapse: separate; border-spacing: 0; font-size: 12px; width: max-content; min-width: 100%; }
@@ -210,19 +196,4 @@ const MUSTER_CSS = `
 .mr--leave { background: rgba(245,158,11,.16); }
 .mr--od { background: rgba(59,130,246,.16); }
 .mr--ot { background: rgba(139,92,246,.16); }
-.print-only { display: none; }
-@media print {
-  @page { size: landscape; margin: 8mm; }
-  body * { visibility: hidden; }
-  .muster-print-area, .muster-print-area *, .muster-print-head, .muster-print-head * { visibility: visible; }
-  .muster-print-head { display: block; position: absolute; top: 0; left: 0; }
-  .muster-print-area { position: absolute; left: 0; top: 46px; width: 100%; box-shadow: none; }
-  .no-print { display: none !important; }
-  .mr-scroll { overflow: visible; }
-  .mr-table { font-size: 8px; width: 100%; }
-  .mr-table th, .mr-table td { padding: 1px 2px; }
-  .mr-sticky-left, .mr-sticky-right, .mr-table thead th { position: static; }
-  .mr-ename { width: auto; max-width: none; }
-  .muster-print-ts { font-size: 9px; color: #555; }
-}
 `;
