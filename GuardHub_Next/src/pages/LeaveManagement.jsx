@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
@@ -146,9 +147,13 @@ export default function LeaveManagement() {
         title="Leave Management"
         subtitle={`${totals.employees ?? 0} employees · ${totals.taken ?? 0} days taken · ${applied.year}`}
         actions={
-          <Button variant="outline" disabled={!rows.length} onClick={onExport}>
-            <Icon name="download" size={16} /> Export CSV
-          </Button>
+          <>
+            <Link className="btn btn--outline" to="/leaves/view"><Icon name="calendar-month" size={16} /> View Leaves</Link>
+            <Button variant="outline" disabled={!rows.length} onClick={onExport}>
+              <Icon name="download" size={16} /> Export CSV
+            </Button>
+            <Link className="btn btn--primary" to="/apply/leave"><Icon name="plus" size={16} /> Apply Leave</Link>
+          </>
         }
       />
 
