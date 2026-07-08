@@ -151,6 +151,20 @@ async function buildYearRows(year, empIdFilter) {
     .sort((a, b) => a.empId - b.empId);
 }
 
+// Remaining balance for ONE employee/year/type, using the exact same derivation
+// as every balance read (buildYearRows) — so Comp Off here == Comp Off shown on
+// Apply Leave / Leave Management. This is the single source used to guard
+// balance-limited leave (e.g. Comp Off can never go negative). Returns 0 if the
+// employee/type is not found.
+async function getRemainingForType(empId, year, leaveTypeCode) {
+  const code = String(leaveTypeCode).toUpperCase();
+  const rows = await buildYearRows(year, empId);
+  const row = rows[0];
+  if (!row) return 0;
+  const t = row.byType.find((b) => b.leaveTypeCode === code);
+  return t ? t.remaining : 0;
+}
+
 // GET /leave/balances?year=2026&empId=1234  (output shape unchanged)
 const getBalances = async (req, res) => {
   try {
@@ -233,6 +247,7 @@ module.exports = {
   adjustBalanceUsed,
   buildYearRows,
   getBalanceMap,
+  getRemainingForType,
   bucket,
   syncLeaveTypeQuota,
   compOffEarnedMap,

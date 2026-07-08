@@ -8,8 +8,10 @@ import FormActions from "../components/forms/FormActions";
 import DateField from "../components/forms/DateField";
 import { Field, Select, Textarea } from "../components/ui/Field";
 import EmployeeLeaveSummary from "../components/leave/EmployeeLeaveSummary";
-import { useRecordLeave, useLeaveTypes } from "../hooks/useLeaveV2";
+import { useRecordLeave, useLeaveTypes, useLeaveBalances } from "../hooks/useLeaveV2";
 import { SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
+import { compOffRemaining } from "../utils/leaveSummary";
+import { toast } from "../store/toastStore";
 
 // Apply Leave (v2): pick employee → choose type/shift/duration/dates → reason →
 // submit. This records a leave TRANSACTION which auto-debits the balance and
@@ -30,13 +32,24 @@ export default function ApplyLeave() {
   const [emp, setEmp] = useState(null);
   const [form, setForm] = useState(INIT);
   const [errors, setErrors] = useState({});
+  const [compShort, setCompShort] = useState(false); // highlight balance on shortfall
   const record = useRecordLeave();
   const { data: types = [] } = useLeaveTypes(true);
 
   const year = new Date().getFullYear();
 
-  const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
-  const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
+  // Employee's live Comp Off balance (same source as the summary panel), used to
+  // block a Comp Off leave that would overdraw it.
+  const { data: bal } = useLeaveBalances(year, emp?.empId, { enabled: !!emp });
+  const compAvailable = compOffRemaining(bal);
+  const isCompOff = form.leaveTypeCode === "COMP";
+
+  // Clearing the shortfall highlight whenever the inputs that affect it change.
+  const set = (k) => (e) => {
+    setCompShort(false);
+    setForm((f) => ({ ...f, [k]: e.target.value }));
+  };
+  const reset = () => { setForm(INIT); setEmp(null); setErrors({}); setCompShort(false); };
 
   const days = previewDays(form.fromDate, form.toDate, form.dayType);
 
@@ -57,6 +70,18 @@ export default function ApplyLeave() {
   const onSubmit = async (e) => {
     e.preventDefault();
     if (!validate()) return;
+
+    // Comp Off can never go negative: block before the API call if the request
+    // exceeds the available (earned − used) balance. Backend enforces this too.
+    if (isCompOff && days != null && days > compAvailable) {
+      setCompShort(true);
+      toast.error(
+        `Insufficient Comp Off balance — Available: ${compAvailable} day(s), Requested: ${days} day(s). ` +
+        `Please reduce the requested duration or earn additional Comp Off before applying.`
+      );
+      return;
+    }
+
     try {
       await record.mutateAsync({
         empId: parseInt(emp.empId, 10),
@@ -79,7 +104,7 @@ export default function ApplyLeave() {
         onSubmit={onSubmit}
         aside={
           <FormSection title="Employee Information" description="Search and verify the employee">
-            <EmployeePicker selected={emp} onSelect={setEmp} />
+            <EmployeePicker selected={emp} onSelect={(x) => { setCompShort(false); setEmp(x); }} />
             {errors.emp && <div className="field__error">{errors.emp}</div>}
             {!emp && <p className="muted text-sm" style={{ margin: "8px 0 0" }}>Select an employee to begin.</p>}
             {emp && (
@@ -88,6 +113,7 @@ export default function ApplyLeave() {
                 year={year}
                 selectedTypeCode={form.leaveTypeCode}
                 projectedDays={days}
+                highlightComp={compShort}
               />
             )}
           </FormSection>

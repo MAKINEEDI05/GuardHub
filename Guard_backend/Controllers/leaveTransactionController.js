@@ -3,7 +3,11 @@ const LeaveType = require("../models/leaveTypeScheme");
 const Leave = require("../models/leaveScheme"); // legacy leave_mgmt (compat)
 const { resolveActiveEmployee, getActiveEmployeeIds } = require("../utils/employeeRef");
 const { computeLeaveDays } = require("../utils/leaveDays");
-const { adjustBalanceUsed } = require("./leaveBalanceController");
+const {
+  adjustBalanceUsed,
+  getRemainingForType,
+  COMP_CODE,
+} = require("./leaveBalanceController");
 
 // POST /leave/transactions
 // Records ONE leave: creates the transaction, debits the balance, and mirrors a
@@ -43,6 +47,21 @@ const recordLeave = async (req, res) => {
     const from = new Date(`${String(fromDate).slice(0, 10)}T00:00:00.000Z`);
     const month = from.getUTCMonth() + 1;
     const year = from.getUTCFullYear();
+
+    // 3b. Comp Off can NEVER go negative: a Comp Off leave may consume at most
+    //     the days EARNED from approved OT minus Comp Off already used. Checked
+    //     before writing anything (same balance derivation as every read).
+    if (type.code === COMP_CODE) {
+      const available = await getRemainingForType(empIdNum, year, COMP_CODE);
+      if (days > available) {
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient Comp Off balance.",
+          available,
+          requested: days,
+        });
+      }
+    }
 
     // 4. Legacy mirror (keeps attendance/reporting working).
     legacy = await Leave.create({
@@ -150,6 +169,23 @@ const updateLeave = async (req, res) => {
     const to = new Date(`${String(toRaw).slice(0, 10)}T00:00:00.000Z`);
     const month = from.getUTCMonth() + 1;
     const year = from.getUTCFullYear();
+
+    // Comp Off can never go negative on an edit either. Capacity for the new
+    // value is the current remaining PLUS this transaction's own Comp Off debit
+    // (which the rebalance below reverses first) when it was already Comp Off in
+    // the same year.
+    if (type.code === COMP_CODE) {
+      let available = await getRemainingForType(txn.empId, year, COMP_CODE);
+      if (txn.leaveTypeCode === COMP_CODE && txn.year === year) available += txn.days;
+      if (days > available) {
+        return res.status(400).json({
+          success: false,
+          message: "Insufficient Comp Off balance.",
+          available,
+          requested: days,
+        });
+      }
+    }
 
     // Rebalance: reverse the OLD debit, apply the NEW one (covers a changed
     // type/year/day-count in one consistent step).

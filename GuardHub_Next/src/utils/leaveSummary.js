@@ -42,6 +42,16 @@ export function computeOdSummary(records = []) {
   return { entries: records.length, totalDays };
 }
 
+// Comp Off days currently AVAILABLE for an employee, read from a leave-balances
+// API payload (data[0].byType, COMP type). remaining = earned(OT) - used. This
+// is the single source the Apply Leave guard and the summary panel both use so
+// the "available" number can't drift. Returns 0 when unknown.
+export function compOffRemaining(balData) {
+  const row = balData?.data?.[0];
+  const comp = row?.byType?.find((b) => b.leaveTypeCode === "COMP");
+  return comp ? comp.remaining : 0;
+}
+
 // Most-recent item by a date field (createdAt first, then a fallback field).
 export function mostRecent(records = [], fallbackField) {
   if (!records.length) return null;

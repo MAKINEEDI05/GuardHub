@@ -10,8 +10,8 @@ import { computeOtSummary, computeOdSummary, mostRecent } from "../../utils/leav
 // OD-by-emp) — no new APIs, no duplicated calculations. Compact cards in the
 // existing GuardHub design system.
 //
-// props: { emp, year, selectedTypeCode?, projectedDays? }
-export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, projectedDays }) {
+// props: { emp, year, selectedTypeCode?, projectedDays?, highlightComp? }
+export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, projectedDays, highlightComp }) {
   const empId = emp?.empId;
   const { data: bal, isLoading: balLoading } = useLeaveBalances(year, empId, { enabled: !!empId });
   const { data: otRecords = [] } = useOtByEmp(empId);
@@ -82,8 +82,21 @@ export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, proj
 
       {/* OT + OD Summary (side by side) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div className="card" style={{ padding: 12 }}>
+        <div
+          className="card"
+          style={{
+            padding: 12,
+            ...(highlightComp
+              ? { borderColor: "var(--danger, #dc2626)", boxShadow: "0 0 0 2px var(--danger, #dc2626)" }
+              : {}),
+          }}
+        >
           <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 8 }}>OT / Comp Off</div>
+          {highlightComp && (
+            <div className="text-sm" style={{ color: "var(--danger, #dc2626)", fontWeight: 600, marginBottom: 6 }}>
+              Insufficient Comp Off balance
+            </div>
+          )}
           <MiniRow label="OT Entries" value={ot.entries} />
           <MiniRow label="OT Days" value={ot.totalDays} />
           <MiniRow label="Earned" value={comp ? comp.allocated : ot.compOff} hint="approved OT" />
