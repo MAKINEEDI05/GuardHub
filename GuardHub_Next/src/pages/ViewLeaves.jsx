@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
-import SearchBar from "../components/ui/SearchBar";
+import EmployeeSearchFilter from "../components/EmployeeSearchFilter";
 import DataTable from "../components/ui/DataTable";
 import Badge from "../components/ui/Badge";
 import Icon from "../components/ui/Icon";
@@ -22,7 +22,7 @@ export default function ViewLeaves() {
   const { data: leaves = [], isLoading } = useLeaveTransactions();
   const { data: employees = [] } = useEmployees();
   const del = useDeleteLeaveTxn();
-  const [term, setTerm] = useState("");
+  const [selEmp, setSelEmp] = useState(null);
   const [viewTxn, setViewTxn] = useState(null);
   const [editTxn, setEditTxn] = useState(null);
   const [delTxn, setDelTxn] = useState(null);
@@ -37,17 +37,13 @@ export default function ViewLeaves() {
   }, [employees]);
 
   const rows = useMemo(() => {
-    const q = term.trim().toLowerCase();
     const withEmp = leaves.map((l) => {
       const e = empMap.get(String(l.empId)) || {};
       return { ...l, _name: e.empName || `ID ${l.empId}`, _dept: e.empDepartment || "", _desig: e.empDesignation || "" };
     });
-    if (!q) return withEmp;
-    return withEmp.filter((l) =>
-      [l.empId, l._name, l._dept, l._desig, l.leaveTypeName, l.reason]
-        .map((v) => String(v ?? "").toLowerCase()).some((v) => v.includes(q))
-    );
-  }, [leaves, term, empMap]);
+    if (!selEmp) return withEmp;
+    return withEmp.filter((l) => String(l.empId) === String(selEmp.empId));
+  }, [leaves, selEmp, empMap]);
 
   // The table column model is the single source of truth for both the rendered
   // table AND the CSV export (see exportTableCsv). Each column declares how it
@@ -99,7 +95,7 @@ export default function ViewLeaves() {
     baseName: "leave-transactions",
     columns,
     rows: displayRows.length ? displayRows : rows,
-    isFiltered: !!term.trim(),
+    isFiltered: !!selEmp,
     noun: "leave records",
   });
 
@@ -119,7 +115,7 @@ export default function ViewLeaves() {
         }
       />
       <div className="toolbar">
-        <SearchBar value={term} onChange={setTerm} placeholder="Search by employee, type, reason..." />
+        <EmployeeSearchFilter selected={selEmp} onSelect={setSelEmp} />
       </div>
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15}
         emptyTitle="No leave records found" emptyIcon="🌴" pageSizeOptions={[15, 30, 50]}

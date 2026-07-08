@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
-import SearchBar from "../components/ui/SearchBar";
+import EmployeeSearchFilter from "../components/EmployeeSearchFilter";
 import DataTable from "../components/ui/DataTable";
 import Badge from "../components/ui/Badge";
 import Icon from "../components/ui/Icon";
@@ -28,7 +28,7 @@ export default function ViewOd() {
   const { data: ods = [], isLoading } = useOds();
   const { data: employees = [] } = useEmployees();
   const del = useDeleteOd();
-  const [term, setTerm] = useState("");
+  const [selEmp, setSelEmp] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [viewOd, setViewOd] = useState(null);
   const [editOd, setEditOd] = useState(null);
@@ -41,15 +41,10 @@ export default function ViewOd() {
   const nameOf = (id) => empMap.get(String(id))?.empName || `ID ${id}`;
 
   const rows = useMemo(() => {
-    const q = term.trim().toLowerCase();
     const withName = ods.map((o) => ({ ...o, _name: nameOf(o.empId) }));
-    if (!q) return withName;
-    return withName.filter((o) =>
-      [o.empId, o._name, o.odLocation, o.empPurpose]
-        .map((v) => String(v ?? "").toLowerCase())
-        .some((v) => v.includes(q))
-    );
-  }, [ods, term, empMap]);
+    if (!selEmp) return withName;
+    return withName.filter((o) => String(o.empId) === String(selEmp.empId));
+  }, [ods, selEmp, empMap]);
 
   const columns = [
     {
@@ -99,7 +94,7 @@ export default function ViewOd() {
                 { key: "shift", label: "Shift" }, { key: "purpose", label: "Purpose" },
               ],
               rows: exportRows,
-              isFiltered: !!term.trim(),
+              isFiltered: !!selEmp,
               noun: "OD records",
             })}>
               <Icon name="download" size={16} /> Export
@@ -109,7 +104,7 @@ export default function ViewOd() {
         }
       />
       <div className="toolbar">
-        <SearchBar value={term} onChange={setTerm} placeholder="Search by employee, location, purpose..." />
+        <EmployeeSearchFilter selected={selEmp} onSelect={setSelEmp} />
       </div>
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15} emptyTitle="No OD records found" emptyIcon="📋" />
 

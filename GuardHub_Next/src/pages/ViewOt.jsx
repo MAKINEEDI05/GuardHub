@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import Button from "../components/ui/Button";
-import SearchBar from "../components/ui/SearchBar";
+import EmployeeSearchFilter from "../components/EmployeeSearchFilter";
 import DataTable from "../components/ui/DataTable";
 import Badge from "../components/ui/Badge";
 import Icon from "../components/ui/Icon";
@@ -29,7 +29,7 @@ export default function ViewOt() {
   const { data: employees = [] } = useEmployees();
   const del = useDeleteOt();
   const update = useUpdateOt();
-  const [term, setTerm] = useState("");
+  const [selEmp, setSelEmp] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [viewOt, setViewOt] = useState(null);
   const [editOt, setEditOt] = useState(null);
@@ -43,14 +43,9 @@ export default function ViewOt() {
   }, [employees]);
 
   const rows = useMemo(() => {
-    const q = term.trim().toLowerCase();
-    if (!q) return ots;
-    return ots.filter((o) =>
-      [o.employeeId, o.employeeName, o.location, o.reason, o.status]
-        .map((v) => String(v ?? "").toLowerCase())
-        .some((v) => v.includes(q))
-    );
-  }, [ots, term]);
+    if (!selEmp) return ots;
+    return ots.filter((o) => String(o.employeeId) === String(selEmp.empId));
+  }, [ots, selEmp]);
 
   const columns = [
     {
@@ -118,7 +113,7 @@ export default function ViewOt() {
                 { key: "location", label: "Location" }, { key: "reason", label: "Reason" }, { key: "status", label: "Status" },
               ],
               rows: exportRows,
-              isFiltered: !!term.trim(),
+              isFiltered: !!selEmp,
               noun: "OT records",
             })}>
               <Icon name="download" size={16} /> Export
@@ -128,7 +123,7 @@ export default function ViewOt() {
         }
       />
       <div className="toolbar">
-        <SearchBar value={term} onChange={setTerm} placeholder="Search by employee, location, status..." />
+        <EmployeeSearchFilter selected={selEmp} onSelect={setSelEmp} />
       </div>
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15} emptyTitle="No OT records found" emptyIcon="⏰" />
 
