@@ -3,61 +3,81 @@ const LeaveType = require("../models/leaveTypeScheme");
 const employe = require("../models/profileScheme");
 const { ACTIVE_FILTER, getActiveEmployeeIds } = require("../utils/employeeRef");
 
+// One balance document per (empId, year) now holds every type under `types`.
+// These helpers are the ONLY place that shape is read/written, so the rest of
+// the app keeps seeing the same { allocated, used, remaining } view it always did.
+
+// Safe read of a single type bucket from a balance doc's `types` object.
+const bucket = (types, code) => (types && types[code]) || { allocated: 0, used: 0 };
+
 // --- Shared ledger mutation ---------------------------------------------------
 // Adjust an employee's `used` for a (year, type) by +days (record) or -days
-// (delete). Creates the balance row on first use, seeding `allocated` from the
-// leave type's default quota so `remaining` is meaningful even before a formal
-// yearly allocation has been run. `used` is floored at 0 so a delete can never
-// drive it negative. This is the single place `used` is ever changed.
+// (delete/edit). Upserts the single per-year document and the type bucket inside
+// it, seeding `allocated` from the type's default quota on first touch. `used` is
+// floored at 0. This is the single place `used` is ever changed.
 async function adjustBalanceUsed({ empId, year, leaveTypeCode, days, defaultQuota = 0 }) {
   const code = String(leaveTypeCode).toUpperCase();
   await LeaveBalance.updateOne(
-    { empId, year, leaveTypeCode: code },
+    { empId, year },
     {
-      $inc: { used: days },
-      $setOnInsert: { allocated: defaultQuota },
+      $inc: { [`types.${code}.used`]: days },
+      $setOnInsert: { [`types.${code}.allocated`]: defaultQuota },
     },
     { upsert: true }
   );
-  // Floor used at 0 (guards against deleting more than was recorded).
+  // Floor used at 0 (guards against removing more than was recorded).
   await LeaveBalance.updateOne(
-    { empId, year, leaveTypeCode: code, used: { $lt: 0 } },
-    { $set: { used: 0 } }
+    { empId, year, [`types.${code}.used`]: { $lt: 0 } },
+    { $set: { [`types.${code}.used`]: 0 } }
   );
 }
 
-// Build per-employee balance rows for a year (used by the Balances page). Names
-// come from the master — nothing is duplicated into leave_balances.
+// empId -> types object ({ CODE: { allocated, used } }) for a year. Optionally
+// restricted to a set of employee ids. Reused by buildYearRows, the report and
+// the unified manage endpoint so balance access lives in one place.
+async function getBalanceMap(year, empIds) {
+  const q = { year };
+  if (Array.isArray(empIds) && empIds.length) q.empId = { $in: empIds };
+  const docs = await LeaveBalance.find(q).lean();
+  const map = new Map();
+  docs.forEach((d) => map.set(d.empId, d.types || {}));
+  return map;
+}
+
+// Build per-employee balance rows for a year (byType + totals). Output shape is
+// unchanged from the pre-refactor version so existing consumers keep working.
 async function buildYearRows(year, empIdFilter) {
-  const [employees, balances, types] = await Promise.all([
+  const [employees, types] = await Promise.all([
     employe.find(ACTIVE_FILTER).lean(),
-    LeaveBalance.find(
-      empIdFilter != null ? { year, empId: empIdFilter } : { year }
-    ).lean(),
     LeaveType.find({ active: true }).sort({ sortOrder: 1, name: 1 }).lean(),
   ]);
 
-  const nameByCode = new Map(types.map((t) => [t.code, t.name]));
-  const balByEmp = new Map();
-  balances.forEach((b) => {
-    if (!balByEmp.has(b.empId)) balByEmp.set(b.empId, []);
-    balByEmp.get(b.empId).push(b);
-  });
+  const list =
+    empIdFilter != null ? employees.filter((e) => e.empId === empIdFilter) : employees;
 
-  const list = empIdFilter != null
-    ? employees.filter((e) => e.empId === empIdFilter)
-    : employees;
+  const balMap = await getBalanceMap(
+    year,
+    empIdFilter != null ? [empIdFilter] : list.map((e) => e.empId)
+  );
 
   return list
     .map((e) => {
-      const rows = balByEmp.get(e.empId) || [];
-      const byType = rows.map((b) => ({
-        leaveTypeCode: b.leaveTypeCode,
-        leaveTypeName: nameByCode.get(b.leaveTypeCode) || b.leaveTypeCode,
-        allocated: b.allocated || 0,
-        used: b.used || 0,
-        remaining: (b.allocated || 0) - (b.used || 0),
-      }));
+      const typesObj = balMap.get(e.empId) || {};
+      const byType = types
+        .map((t) => {
+          const b = bucket(typesObj, t.code);
+          const allocated = b.allocated || 0;
+          const used = b.used || 0;
+          return {
+            leaveTypeCode: t.code,
+            leaveTypeName: t.name,
+            allocated,
+            used,
+            remaining: allocated - used,
+          };
+        })
+        // keep only types that are actually in play for this employee/year
+        .filter((r) => r.allocated > 0 || r.used > 0);
       const totals = byType.reduce(
         (a, r) => ({
           allocated: a.allocated + r.allocated,
@@ -78,7 +98,7 @@ async function buildYearRows(year, empIdFilter) {
     .sort((a, b) => a.empId - b.empId);
 }
 
-// GET /leave/balances?year=2026&empId=1234
+// GET /leave/balances?year=2026&empId=1234  (output shape unchanged)
 const getBalances = async (req, res) => {
   try {
     const year = parseInt(req.query.year, 10) || new Date().getFullYear();
@@ -97,7 +117,8 @@ const getBalances = async (req, res) => {
 // POST /leave/balances/allocate
 // { year, allocations:[{leaveTypeCode, allocated}], empIds?:[...] }
 // Upserts `allocated` for the given types across the target employees (all
-// active employees when empIds is omitted). Never touches `used`.
+// active employees when empIds is omitted). Never touches `used`. Writes ONE
+// document per employee (all types set in a single update).
 const allocateBalances = async (req, res) => {
   try {
     const year = parseInt(req.body.year, 10);
@@ -126,20 +147,19 @@ const allocateBalances = async (req, res) => {
       return res.status(400).json({ message: `Unknown leave type code(s): ${bad.join(", ")}` });
     }
 
-    const ops = [];
-    for (const empId of targets) {
-      for (const a of allocations) {
-        const code = String(a.leaveTypeCode).toUpperCase();
-        const allocated = Math.max(0, Number(a.allocated) || 0);
-        ops.push({
-          updateOne: {
-            filter: { empId, year, leaveTypeCode: code },
-            update: { $set: { allocated }, $setOnInsert: { used: 0 } },
-            upsert: true,
-          },
-        });
-      }
-    }
+    // One update per employee sets every allocated type at once.
+    const setObj0 = {};
+    allocations.forEach((a) => {
+      const code = String(a.leaveTypeCode).toUpperCase();
+      setObj0[`types.${code}.allocated`] = Math.max(0, Number(a.allocated) || 0);
+    });
+    const ops = targets.map((empId) => ({
+      updateOne: {
+        filter: { empId, year },
+        update: { $set: { ...setObj0 } },
+        upsert: true,
+      },
+    }));
     const result = await LeaveBalance.bulkWrite(ops, { ordered: false });
     return res.status(200).json({
       message: "Allocation applied",
@@ -159,4 +179,6 @@ module.exports = {
   allocateBalances,
   adjustBalanceUsed,
   buildYearRows,
+  getBalanceMap,
+  bucket,
 };

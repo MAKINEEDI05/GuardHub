@@ -120,6 +120,87 @@ const listTransactions = async (req, res) => {
   }
 };
 
+// PUT /leave/transactions/:id — edit a finalized leave (single-admin, no
+// approval). Editable: leaveTypeCode, shiftType, fromDate, toDate, dayType,
+// reason. Rebalances (reverse the old debit, apply the new one — handles a
+// changed type/year/day-count) and keeps the legacy mirror in sync. The
+// employee is NOT changed here.
+const updateLeave = async (req, res) => {
+  try {
+    const txn = await LeaveTransaction.findById(req.params.id);
+    if (!txn) return res.status(404).json({ message: "Leave transaction not found" });
+
+    // Merge incoming changes over the existing record.
+    const leaveTypeCode = (req.body.leaveTypeCode || txn.leaveTypeCode).toUpperCase();
+    const shiftType = req.body.shiftType !== undefined ? req.body.shiftType : txn.shiftType;
+    const dayType = req.body.dayType !== undefined ? req.body.dayType : txn.dayType;
+    const reason = req.body.reason !== undefined ? String(req.body.reason).trim() : txn.reason;
+    const fromRaw = req.body.fromDate || txn.fromDate;
+    const toRaw = req.body.toDate || txn.toDate;
+
+    // Type must still exist + be active (same rule as Apply).
+    const type = await LeaveType.findOne({ code: leaveTypeCode, active: true });
+    if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
+
+    const days = computeLeaveDays(fromRaw, toRaw, dayType);
+    if (days === null || days <= 0) {
+      return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
+    }
+    const from = new Date(`${String(fromRaw).slice(0, 10)}T00:00:00.000Z`);
+    const to = new Date(`${String(toRaw).slice(0, 10)}T00:00:00.000Z`);
+    const month = from.getUTCMonth() + 1;
+    const year = from.getUTCFullYear();
+
+    // Rebalance: reverse the OLD debit, apply the NEW one (covers a changed
+    // type/year/day-count in one consistent step).
+    await adjustBalanceUsed({
+      empId: txn.empId, year: txn.year, leaveTypeCode: txn.leaveTypeCode, days: -txn.days,
+    });
+    await adjustBalanceUsed({
+      empId: txn.empId, year, leaveTypeCode: type.code, days,
+      defaultQuota: type.defaultAnnualQuota || 0,
+    });
+
+    // Update the authoritative transaction (snapshots refreshed from the type).
+    txn.set({
+      leaveTypeCode: type.code,
+      leaveTypeName: type.name,
+      isPaid: type.isPaid,
+      shiftType,
+      dayType,
+      reason,
+      fromDate: from,
+      toDate: to,
+      days,
+      month,
+      year,
+    });
+    await txn.save();
+
+    // Keep the legacy mirror in sync (attendance/month-wise report read it).
+    if (txn.legacyLeaveId) {
+      await Leave.updateOne(
+        { _id: txn.legacyLeaveId },
+        {
+          $set: {
+            empLeaveType: type.name,
+            empFromDate: from,
+            empToDate: to,
+            empShiftType: shiftType,
+            empOdType: dayType,
+            empReason: reason || "Leave",
+          },
+        }
+      ).catch(() => {});
+    }
+
+    return res.status(200).json({ message: "Leave updated", data: txn });
+  } catch (error) {
+    console.error("Error updating leave:", error);
+    return res.status(500).json({ message: "Failed to update leave", error: error.message });
+  }
+};
+
 // DELETE /leave/transactions/:id — reverses the balance debit and removes the
 // mirrored legacy row so nothing drifts.
 const deleteTransaction = async (req, res) => {
@@ -145,4 +226,4 @@ const deleteTransaction = async (req, res) => {
   }
 };
 
-module.exports = { recordLeave, listTransactions, deleteTransaction };
+module.exports = { recordLeave, listTransactions, updateLeave, deleteTransaction };

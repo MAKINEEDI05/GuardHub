@@ -25,9 +25,11 @@ const {
 const {
   recordLeave,
   listTransactions,
+  updateLeave,
   deleteTransaction,
 } = require("../Controllers/leaveTransactionController");
 const {
+  getLeaveManagement,
   getLeaveReport,
   getMonthlySummary,
   getYearlySummary,
@@ -44,10 +46,14 @@ router.delete("/types/:id", deleteType);
 router.get("/balances", getBalances);
 router.post("/balances/allocate", allocateBalances);
 
-// ---- Leave Transactions (record / history / delete) ----
+// ---- Leave Transactions (record / history / edit / delete) ----
 router.get("/transactions", listTransactions);
 router.post("/transactions", recordLeave);
+router.put("/transactions/:id", updateLeave);
 router.delete("/transactions/:id", deleteTransaction);
+
+// ---- Unified Employee Leave Management (filtered summary + drawer + CSV) ----
+router.get("/manage", getLeaveManagement);
 
 // ---- Reports & salary-facing summaries ----
 router.get("/reports/summary", getLeaveReport);

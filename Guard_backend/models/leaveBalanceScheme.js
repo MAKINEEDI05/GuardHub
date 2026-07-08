@@ -1,48 +1,42 @@
 const mongoose = require("mongoose");
 
-// Leave Balances (collection: leave_balances).
+// Leave Balances (collection: leave_balances) — REDESIGNED.
 //
-// One row per (employee, year, leaveType). This is the running ledger head:
-//   allocated  – granted for the year (yearly allocation / policy)
-//   used       – consumed so far (auto-maintained by the transaction controller)
-//   remaining  – VIRTUAL, always allocated - used (never stored, never stale)
+// ONE document per (employee, year). All of an employee's per-type balances live
+// inside a single `types` object keyed by leave-type code:
 //
-// Relationship: `empId` is the same Number identifier used by the employee
-// master (securitydetails.empId) — we do NOT copy any employee attributes here,
-// names/departments are always resolved from the master at read time.
+//   { empId: 309, year: 2026, types: {
+//       CL:  { allocated: 12, used: 3 },
+//       SUM: { allocated: 4,  used: 2 },
+//       HOL: { allocated: 4,  used: 1 },
+//       SPL: { allocated: 6,  used: 1 },
+//   } }
 //
-// Yearly tracking falls out naturally from the `year` field: querying a year
-// gives that year's allocation/usage; a new year simply gets new rows. Summing
-// a year's rows for an employee yields the "Allocated 24 / Used 9 / Remaining
-// 15" headline.
+// This replaces the previous one-document-per-type layout (which produced 4+
+// docs per employee/year). `remaining` is always derived (allocated - used),
+// never stored, so it can't drift.
+//
+// `types` is a Mixed object (not a typed sub-schema) specifically so atomic
+// dotted updates — `$inc: { "types.CL.used": 1 }`, `$set: { "types.CL.allocated"
+// : 12 }` — apply cleanly at the Mongo layer without per-key casting. All writes
+// go through leaveBalanceController (updateOne/bulkWrite), never doc.save(), so
+// no markModified is needed.
 const leaveBalanceSchema = new mongoose.Schema(
   {
     empId: { type: Number, required: true, index: true },
     year: { type: Number, required: true, index: true },
-    leaveTypeCode: { type: String, required: true, uppercase: true, trim: true },
-
-    allocated: { type: Number, default: 0, min: 0 },
-    used: { type: Number, default: 0, min: 0 },
+    // { <TYPE_CODE>: { allocated: Number, used: Number } }
+    types: { type: Object, default: {} },
   },
   {
     versionKey: false,
     timestamps: true,
-    toJSON: { virtuals: true },
-    toObject: { virtuals: true },
+    minimize: false, // keep an empty {} types object rather than dropping it
   }
 );
 
-// Remaining is derived, never persisted — so it can never drift from used.
-leaveBalanceSchema.virtual("remaining").get(function () {
-  return (this.allocated || 0) - (this.used || 0);
-});
-
-// One balance row per employee/year/type — makes upserts safe and prevents
-// duplicate ledgers (a gap called out in the audit).
-leaveBalanceSchema.index(
-  { empId: 1, year: 1, leaveTypeCode: 1 },
-  { unique: true }
-);
+// One balance document per employee per year (the whole point of the redesign).
+leaveBalanceSchema.index({ empId: 1, year: 1 }, { unique: true });
 
 module.exports = mongoose.model(
   "leaveBalance",
