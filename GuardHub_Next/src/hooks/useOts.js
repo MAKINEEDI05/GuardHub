@@ -7,6 +7,15 @@ export function useOts() {
   return useQuery({ queryKey: QK.ot, queryFn: otService.all });
 }
 
+// All OT records for a single employee (reuses GET /ot/get-ot-by-empid).
+export function useOtByEmp(empId) {
+  return useQuery({
+    queryKey: ["ot", "emp", String(empId ?? "")],
+    queryFn: () => otService.byEmp(empId),
+    enabled: !!empId,
+  });
+}
+
 export function useApplyOt() {
   const qc = useQueryClient();
   return useMutation({

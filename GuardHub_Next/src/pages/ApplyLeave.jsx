@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import EmployeePicker from "../components/EmployeePicker";
@@ -7,7 +7,8 @@ import FormSection from "../components/forms/FormSection";
 import FormActions from "../components/forms/FormActions";
 import DateField from "../components/forms/DateField";
 import { Field, Select, Textarea } from "../components/ui/Field";
-import { useRecordLeave, useLeaveTypes, useLeaveBalances } from "../hooks/useLeaveV2";
+import EmployeeLeaveSummary from "../components/leave/EmployeeLeaveSummary";
+import { useRecordLeave, useLeaveTypes } from "../hooks/useLeaveV2";
 import { SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
 
 // Apply Leave (v2): pick employee → choose type/shift/duration/dates → reason →
@@ -33,20 +34,11 @@ export default function ApplyLeave() {
   const { data: types = [] } = useLeaveTypes(true);
 
   const year = new Date().getFullYear();
-  const { data: bal } = useLeaveBalances(year, emp?.empId, { enabled: !!emp?.empId });
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
 
   const days = previewDays(form.fromDate, form.toDate, form.dayType);
-
-  // Remaining for the chosen type (if the employee has a balance row this year).
-  const remaining = useMemo(() => {
-    if (!bal || !form.leaveTypeCode) return null;
-    const row = bal.data?.[0];
-    const t = row?.byType?.find((b) => b.leaveTypeCode === form.leaveTypeCode);
-    return t ? t.remaining : null;
-  }, [bal, form.leaveTypeCode]);
 
   const validate = () => {
     const errs = {};
@@ -90,16 +82,13 @@ export default function ApplyLeave() {
             <EmployeePicker selected={emp} onSelect={setEmp} />
             {errors.emp && <div className="field__error">{errors.emp}</div>}
             {!emp && <p className="muted text-sm" style={{ margin: "8px 0 0" }}>Select an employee to begin.</p>}
-            {emp && form.leaveTypeCode && (
-              <div className="card" style={{ marginTop: 12, padding: "10px 12px" }}>
-                <div className="text-sm muted">Remaining ({form.leaveTypeCode}) · {year}</div>
-                <div style={{ fontSize: 22, fontWeight: 700 }}>
-                  {remaining == null ? "—" : remaining}
-                  {days != null && remaining != null && (
-                    <span className="text-sm muted" style={{ fontWeight: 400 }}> → {remaining - days} after</span>
-                  )}
-                </div>
-              </div>
+            {emp && (
+              <EmployeeLeaveSummary
+                emp={emp}
+                year={year}
+                selectedTypeCode={form.leaveTypeCode}
+                projectedDays={days}
+              />
             )}
           </FormSection>
         }
