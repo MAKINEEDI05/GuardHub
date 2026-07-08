@@ -13,7 +13,7 @@ import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useLeaveTransactions, useDeleteLeaveTxn } from "../hooks/useLeaveV2";
 import { useEmployees } from "../hooks/useEmployees";
 import { formatDate, formatDateTime } from "../utils/date";
-import { exportFilteredCsv } from "../utils/exportCsv";
+import { exportTableCsv } from "../utils/exportCsv";
 
 // View Leaves — leave transaction management (like View OT / View OD). Every
 // leave is a finalized record (single-admin, no approval), so there is no status
@@ -26,6 +26,9 @@ export default function ViewLeaves() {
   const [viewTxn, setViewTxn] = useState(null);
   const [editTxn, setEditTxn] = useState(null);
   const [delTxn, setDelTxn] = useState(null);
+  // The exact filtered+sorted rows the table is showing (all pages), fed back
+  // from DataTable so the export mirrors the table precisely.
+  const [displayRows, setDisplayRows] = useState([]);
 
   const empMap = useMemo(() => {
     const m = new Map();
@@ -46,7 +49,12 @@ export default function ViewLeaves() {
     );
   }, [leaves, term, empMap]);
 
-  const columns = [
+  // The table column model is the single source of truth for both the rendered
+  // table AND the CSV export (see exportTableCsv). Each column declares how it
+  // serializes via exportCols / exportValue (+ exportLabel); a new column added
+  // here is exported automatically. Memoized so its reference is stable — the
+  // DataTable derives its sorted set (and reports it back) from `columns`.
+  const columns = useMemo(() => [
     {
       key: "_name", header: "Employee", sortable: true, sortValue: (l) => l._name,
       render: (l) => (
@@ -55,18 +63,26 @@ export default function ViewLeaves() {
           empId={l.empId}
         />
       ),
+      // Composite cell -> four flat CSV columns.
+      exportCols: [
+        { label: "Employee ID", value: (l) => l.empId },
+        { label: "Employee Name", value: (l) => l._name },
+        { label: "Department", value: (l) => l._dept },
+        { label: "Designation", value: (l) => l._desig },
+      ],
     },
-    { key: "leaveTypeName", header: "Leave Type", render: (l) => <Badge status="leave">{l.leaveTypeName}</Badge> },
-    { key: "shiftType", header: "Shift", render: (l) => l.shiftType || "—" },
-    { key: "fromDate", header: "From", sortable: true, sortValue: (l) => new Date(l.fromDate).getTime(), render: (l) => formatDate(l.fromDate) },
-    { key: "toDate", header: "To", render: (l) => formatDate(l.toDate) },
-    { key: "dayType", header: "Duration", render: (l) => l.dayType || "—" },
-    { key: "days", header: "Days", className: "num", sortable: true, render: (l) => <strong>{l.days}</strong> },
+    { key: "leaveTypeName", header: "Leave Type", render: (l) => <Badge status="leave">{l.leaveTypeName}</Badge>, exportValue: (l) => l.leaveTypeName },
+    { key: "shiftType", header: "Shift", render: (l) => l.shiftType || "—", exportValue: (l) => l.shiftType },
+    { key: "fromDate", header: "From", sortable: true, sortValue: (l) => new Date(l.fromDate).getTime(), render: (l) => formatDate(l.fromDate), exportLabel: "From Date", exportValue: (l) => formatDate(l.fromDate) },
+    { key: "toDate", header: "To", render: (l) => formatDate(l.toDate), exportLabel: "To Date", exportValue: (l) => formatDate(l.toDate) },
+    { key: "dayType", header: "Duration", render: (l) => l.dayType || "—", exportValue: (l) => l.dayType },
+    { key: "days", header: "Days", className: "num", sortable: true, render: (l) => <strong>{l.days}</strong>, exportLabel: "Number of Days", exportValue: (l) => l.days },
     {
       key: "reason", header: "Reason",
       render: (l) => (
         <span className="cell-truncate" title={l.reason || ""}>{l.reason || "—"}</span>
       ),
+      exportValue: (l) => l.reason,
     },
     { key: "_actions", header: "Actions", className: "num", render: (l) => (
       <div style={{ display: "inline-flex", gap: 2 }}>
@@ -75,12 +91,17 @@ export default function ViewLeaves() {
         <button className="btn btn--ghost btn--icon" title="Delete" aria-label="Delete leave" onClick={() => setDelTxn(l)}><Icon name="trash" size={16} /></button>
       </div>
     ) },
-  ];
+  ], [empMap]);
 
-  const exportRows = rows.map((l) => ({
-    empId: l.empId, name: l._name, dept: l._dept, desig: l._desig, type: l.leaveTypeName,
-    shift: l.shiftType, from: formatDate(l.fromDate), to: formatDate(l.toDate), duration: l.dayType, days: l.days,
-  }));
+  // Export exactly what the table shows: all filtered rows, in the current sort
+  // order (falls back to `rows` before the table has reported its sorted set).
+  const onExport = () => exportTableCsv({
+    baseName: "leave-transactions",
+    columns,
+    rows: displayRows.length ? displayRows : rows,
+    isFiltered: !!term.trim(),
+    noun: "leave records",
+  });
 
   return (
     <>
@@ -90,17 +111,7 @@ export default function ViewLeaves() {
         actions={
           <>
             <Link className="btn btn--outline" to="/leaves"><Icon name="calendar-month" size={16} /> Leave Management</Link>
-            <Button variant="outline" disabled={!rows.length} onClick={() => exportFilteredCsv({
-              baseName: "leave-transactions",
-              columns: [
-                { key: "empId", label: "Employee ID" }, { key: "name", label: "Employee Name" },
-                { key: "dept", label: "Department" }, { key: "desig", label: "Designation" },
-                { key: "type", label: "Leave Type" }, { key: "shift", label: "Shift" },
-                { key: "from", label: "From" }, { key: "to", label: "To" },
-                { key: "duration", label: "Duration" }, { key: "days", label: "Days" },
-              ],
-              rows: exportRows, isFiltered: !!term.trim(), noun: "leave records",
-            })}>
+            <Button variant="outline" disabled={!rows.length} onClick={onExport}>
               <Icon name="download" size={16} /> Export
             </Button>
             <Link className="btn btn--primary" to="/apply/leave"><Icon name="plus" size={16} /> Apply Leave</Link>
@@ -111,7 +122,8 @@ export default function ViewLeaves() {
         <SearchBar value={term} onChange={setTerm} placeholder="Search by employee, type, reason..." />
       </div>
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15}
-        emptyTitle="No leave records found" emptyIcon="🌴" pageSizeOptions={[15, 30, 50]} />
+        emptyTitle="No leave records found" emptyIcon="🌴" pageSizeOptions={[15, 30, 50]}
+        onSortedRows={setDisplayRows} />
 
       {/* View (read-only) */}
       <Drawer open={!!viewTxn} title="Leave Details" onClose={() => setViewTxn(null)} width={520}>
