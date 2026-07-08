@@ -884,3 +884,66 @@ h1, h2, h3, h4, h5 {
   .mw-toolbar__action { width: 100%; margin-left: 0; }
   .mw-toolbar__action .btn { width: 100%; justify-content: center; }
 }
+
+/* ------------------------------------------------------------------ */
+/* Leave Management — filter section (UI only)                        */
+/* ------------------------------------------------------------------ */
+/* One responsive grid; equal-width controls, tight vertical rhythm.  */
+.lm-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(155px, 1fr));
+  gap: 12px;
+  align-items: start;
+}
+/* The grid gap owns the spacing, so drop each field's own bottom margin
+   and make labels a touch smaller/lighter (inputs keep their size). */
+.lm-filter-grid .field { margin-bottom: 0; }
+.lm-filter-grid .field__label {
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+/* From/To dates + Search/Reset on one centered row. The dates share equal
+   width and never wrap apart; the actions block can drop below only on very
+   narrow screens. */
+.lm-daterow {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin-top: 12px;
+}
+.lm-daterow .field__label {
+  font-size: 11px;
+  font-weight: 500;
+  margin-bottom: 4px;
+}
+.lm-daterow__dates {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex: 1 1 320px;
+}
+.lm-daterow__dates .field { margin-bottom: 0; flex: 1 1 0; min-width: 0; }
+.lm-daterow__actions { display: flex; align-items: center; gap: 8px; }
+
+/* Compact selected-employee chip below the search box. */
+.lm-chip {
+  display: inline-flex; align-items: center; gap: 8px;
+  margin-top: 6px; padding: 3px 4px 3px 3px;
+  border: 1px solid var(--border); border-radius: 999px;
+  background: var(--surface-2); max-width: 100%;
+}
+.lm-chip__text {
+  font-size: var(--fs-small); line-height: 1.25; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.lm-chip__name { font-weight: 600; color: var(--text); }
+.lm-chip__meta { color: var(--text-muted); }
+.lm-chip__clear {
+  flex: none; display: inline-flex; align-items: center; gap: 2px;
+  border: none; background: transparent; cursor: pointer;
+  color: var(--text-muted); font-size: var(--fs-small);
+  padding: 2px 8px; border-radius: 999px;
+}
+.lm-chip__clear:hover { color: var(--text); background: var(--surface); }

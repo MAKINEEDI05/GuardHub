@@ -9,6 +9,7 @@ import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { Field, Select } from "../components/ui/Field";
 import { ErrorState } from "../components/ui/States";
 import DateField from "../components/forms/DateField";
+import Avatar from "../components/ui/Avatar";
 import EmployeePicker from "../components/EmployeePicker";
 import LeaveDetailsDrawer from "../components/leave/LeaveDetailsDrawer";
 import { useLeaveManage, useLeaveTypes, useLeaveTransactions } from "../hooks/useLeaveV2";
@@ -158,8 +159,8 @@ export default function LeaveManagement() {
       />
 
       {/* Filter panel */}
-      <div className="card" style={{ padding: 16, marginBottom: 16 }}>
-        <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="card" style={{ padding: 14, marginBottom: 20 }}>
+        <div className="lm-filter-grid">
           <div>
             <EmployeePicker
               selected={draft.searchEmp}
@@ -179,22 +180,28 @@ export default function LeaveManagement() {
               }
             />
             {draft.searchEmp && (
-              <div className="text-sm" style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <span>
-                  Selected: <strong>{draft.searchEmp.empName}</strong> (ID {draft.searchEmp.empId})
-                  {draft.searchEmp.empDepartment ? ` · ${draft.searchEmp.empDepartment}` : ""}
-                  {draft.searchEmp.empDesignation ? ` · ${draft.searchEmp.empDesignation}` : ""}
+              <div className="lm-chip">
+                <Avatar emp={draft.searchEmp} px={22} alt={draft.searchEmp.empName} />
+                <span className="lm-chip__text">
+                  <span className="lm-chip__name">{draft.searchEmp.empName}</span>
+                  <span className="lm-chip__meta">
+                    {" · ID "}{draft.searchEmp.empId}
+                    {draft.searchEmp.empDepartment ? ` · ${draft.searchEmp.empDepartment}` : ""}
+                  </span>
                 </span>
-                <button type="button" className="btn btn--ghost btn--sm"
-                  onClick={() => setDraft((d) => ({ ...d, searchEmp: null, empId: "", department: "", designation: "" }))}>Clear</button>
+                <button type="button" className="lm-chip__clear"
+                  aria-label="Clear selected employee"
+                  onClick={() => setDraft((d) => ({ ...d, searchEmp: null, empId: "", department: "", designation: "" }))}>
+                  × Clear
+                </button>
               </div>
             )}
           </div>
-          <Field label="Department" hint={draft.searchEmp ? "Set by selected employee" : undefined}>
+          <Field label="Department">
             <Select value={draft.department} onChange={set("department")} placeholder="All departments"
               options={withValue(DEPARTMENTS, draft.department)} disabled={!!draft.searchEmp} />
           </Field>
-          <Field label="Designation" hint={draft.searchEmp ? "Set by selected employee" : undefined}>
+          <Field label="Designation">
             <Select value={draft.designation} onChange={set("designation")} placeholder="All designations"
               options={withValue(DESIGNATIONS, draft.designation)} disabled={!!draft.searchEmp} />
           </Field>
@@ -209,12 +216,17 @@ export default function LeaveManagement() {
           <Field label="Month">
             <Select value={draft.month} onChange={set("month")} placeholder="All months" options={MONTHS} />
           </Field>
-          <DateField label="From Date" value={draft.fromDate} onChange={set("fromDate")} />
-          <DateField label="To Date" value={draft.toDate} min={draft.fromDate} onChange={set("toDate")} />
         </div>
-        <div className="row" style={{ marginTop: 12, gap: 8 }}>
-          <Button variant="primary" onClick={onSearch}><Icon name="search" size={16} /> Search</Button>
-          <Button variant="outline" onClick={onReset}>Reset</Button>
+
+        <div className="lm-daterow">
+          <div className="lm-daterow__dates">
+            <DateField label="From Date" value={draft.fromDate} onChange={set("fromDate")} />
+            <DateField label="To Date" value={draft.toDate} min={draft.fromDate} onChange={set("toDate")} />
+          </div>
+          <div className="lm-daterow__actions">
+            <Button variant="primary" onClick={onSearch}><Icon name="search" size={16} /> Search</Button>
+            <Button variant="outline" onClick={onReset}>Reset</Button>
+          </div>
         </div>
       </div>
 
