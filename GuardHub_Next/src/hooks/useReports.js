@@ -1,7 +1,17 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { reportService } from "../services/reportService";
 import { attendanceService } from "../services/attendanceService";
 import { QK } from "../api/queryClient";
+
+// Attendance Muster Roll — per-day grid + monthly summary for the filtered set.
+export function useMusterRoll(filters = {}, enabled = true) {
+  return useQuery({
+    queryKey: QK.musterRoll(filters),
+    queryFn: () => attendanceService.musterRoll(filters),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
 
 export function useAttendanceByDate(date, enabled = true) {
   return useQuery({

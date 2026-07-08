@@ -3,38 +3,7 @@ const LeaveType = require("../models/leaveTypeScheme");
 const employe = require("../models/profileScheme");
 const { ACTIVE_FILTER } = require("../utils/employeeRef");
 const { buildYearRows, getBalanceMap, bucket, compOffEarnedMap, COMP_CODE } = require("./leaveBalanceController");
-
-const escapeRx = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-
-// Active-employee filter with optional search (ID / Name / Mobile) + department
-// / designation narrowing. Everything the report/manage screens filter on that
-// concerns WHO the employee is lives here, so it's applied on the server.
-function employeeScopeFilter(query) {
-  const f = { ...ACTIVE_FILTER };
-  const exactCI = (v) => new RegExp(`^${escapeRx(String(v).trim())}$`, "i");
-  // A specific employee (picked from the autocomplete) scopes the whole summary
-  // to that one employee — the table, drawer and CSV all narrow together.
-  if (query.empId !== undefined && query.empId !== "" && !Number.isNaN(parseInt(query.empId, 10)))
-    f.empId = parseInt(query.empId, 10);
-  if (query.department && String(query.department).trim())
-    f.empDepartment = exactCI(query.department);
-  if (query.designation && String(query.designation).trim())
-    f.empDesignation = exactCI(query.designation);
-
-  const search = query.search && String(query.search).trim();
-  if (search) {
-    const rx = new RegExp(escapeRx(search), "i");
-    const asNum = parseInt(search, 10);
-    const or = [
-      { empName: rx },
-      // mobile is stored as a Number — match on its string form for partials
-      { $expr: { $regexMatch: { input: { $toString: "$empMobileNo" }, regex: search, options: "i" } } },
-    ];
-    if (!Number.isNaN(asNum)) or.push({ empId: asNum });
-    f.$and = [{ $or: or }];
-  }
-  return f;
-}
+const { employeeScopeFilter } = require("../utils/employeeQuery");
 
 // Transaction match shared by the report + manage endpoints. `empIds` scopes to
 // the filtered employee set; the rest mirror the current filters.

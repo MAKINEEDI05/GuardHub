@@ -44,4 +44,5 @@ export const QK = {
   attendanceByDate: (date) => ["attendance", date],
   monthwise: (id, from, to) => ["monthwise", String(id), from, to],
   monthwiseSummary: (from, to) => ["monthwise-summary", from, to],
+  musterRoll: (filters = {}) => ["muster-roll", filters],
 };

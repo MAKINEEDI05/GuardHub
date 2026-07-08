@@ -25,6 +25,7 @@ export const ENDPOINTS = {
   // Month-wise report — mounted at /month
   monthwiseReport: (empId) => `/month/monthwise-report/${empId}`,
   monthwiseSummary: "/month/monthwise-summary", // ?startDate&endDate&empId&search&page&limit
+  musterRoll: "/attendance/muster-roll", // ?year&month&department&designation&shift&search
 
   // Leave — mounted at /leave (legacy, still used by attendance/reports)
   applyLeave: "/leave/apply-leave",

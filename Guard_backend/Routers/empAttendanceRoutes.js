@@ -10,6 +10,7 @@ const {
   todayAttendanceData,
   updateAttendanceByEmpId,
 } = require("../Controllers/attendanceController");
+const { getMusterRoll } = require("../Controllers/musterRollController");
 
 router.post("/add-attendace", addAttendance);
 
@@ -18,6 +19,9 @@ router.get("/today-attendance-data", todayAttendanceData);
 router.put("/update-attendace-byid/:empId", updateAttendanceByEmpId);
 router.get("/get-attendace-bydate/:empDate", getAttendanceByDate); // aggregations
 router.get("/get-attendace-byshiftname/:empShift", getAttendanceByShift); // aggregations
+
+// Attendance Muster Roll (per-day grid + monthly summary; shared engine)
+router.get("/muster-roll", getMusterRoll);
 
 router.get("/monthwise-attendace-report/:empId", getMonthwiseReport); // aggregations
 

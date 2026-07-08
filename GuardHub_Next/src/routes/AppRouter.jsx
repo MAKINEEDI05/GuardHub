@@ -11,6 +11,7 @@ const Employees = lazy(() => import("../pages/Employees"));
 const Roster = lazy(() => import("../pages/Roster"));
 const DayWiseReport = lazy(() => import("../pages/DayWiseReport"));
 const MonthWiseReport = lazy(() => import("../pages/MonthWiseReport"));
+const AttendanceMusterRoll = lazy(() => import("../pages/AttendanceMusterRoll"));
 const LeaveManagement = lazy(() => import("../pages/LeaveManagement"));
 const ViewLeaves = lazy(() => import("../pages/ViewLeaves"));
 const LeaveTypes = lazy(() => import("../pages/LeaveTypes"));
@@ -38,6 +39,7 @@ export default function AppRouter() {
         <Route path="/roster" element={<Roster />} />
         <Route path="/reports/day" element={<DayWiseReport />} />
         <Route path="/reports/month" element={<MonthWiseReport />} />
+        <Route path="/reports/muster" element={<AttendanceMusterRoll />} />
         <Route path="/leaves" element={<LeaveManagement />} />
         <Route path="/leaves/view" element={<ViewLeaves />} />
         <Route path="/leaves/types" element={<LeaveTypes />} />

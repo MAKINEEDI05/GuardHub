@@ -17,6 +17,7 @@ export const NAV_SECTIONS = [
     items: [
       { to: "/reports/day", label: "Day Wise Report", icon: "calendar-day" },
       { to: "/reports/month", label: "Month Wise Report", icon: "calendar-month" },
+      { to: "/reports/muster", label: "Attendance Muster Roll", icon: "calendar-day" },
     ],
   },
   {
