@@ -12,6 +12,10 @@ const escapeRx = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 function employeeScopeFilter(query) {
   const f = { ...ACTIVE_FILTER };
   const exactCI = (v) => new RegExp(`^${escapeRx(String(v).trim())}$`, "i");
+  // A specific employee (picked from the autocomplete) scopes the whole summary
+  // to that one employee — the table, drawer and CSV all narrow together.
+  if (query.empId !== undefined && query.empId !== "" && !Number.isNaN(parseInt(query.empId, 10)))
+    f.empId = parseInt(query.empId, 10);
   if (query.department && String(query.department).trim())
     f.empDepartment = exactCI(query.department);
   if (query.designation && String(query.designation).trim())

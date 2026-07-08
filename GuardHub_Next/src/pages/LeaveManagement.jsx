@@ -5,8 +5,10 @@ import Button from "../components/ui/Button";
 import DataTable from "../components/ui/DataTable";
 import Icon from "../components/ui/Icon";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { Field, Input, Select } from "../components/ui/Field";
+import { Field, Select } from "../components/ui/Field";
+import { ErrorState } from "../components/ui/States";
 import DateField from "../components/forms/DateField";
+import EmployeePicker from "../components/EmployeePicker";
 import LeaveDetailsDrawer from "../components/leave/LeaveDetailsDrawer";
 import { useLeaveManage, useLeaveTypes } from "../hooks/useLeaveV2";
 import { leaveTxnService } from "../services/leaveV2Service";
@@ -19,7 +21,7 @@ import { exportFilteredCsv } from "../utils/exportCsv";
 // table, the details drawer and the CSV export all reflect exactly the same
 // filtered dataset.
 const emptyDraft = (year) => ({
-  search: "", fromDate: "", toDate: "", department: "", designation: "",
+  searchEmp: null, empId: "", fromDate: "", toDate: "", department: "", designation: "",
   year, month: "", leaveTypeCode: "",
 });
 
@@ -36,20 +38,21 @@ export default function LeaveManagement() {
 
   const set = (k) => (e) => setDraft((d) => ({ ...d, [k]: e.target.value }));
 
-  // Only send the filters that are set (year always).
+  // Only send the filters that are set (year always). `searchEmp` is UI-only;
+  // the picked employee is sent as `empId`.
   const activeFilters = useMemo(() => {
     const f = { year: applied.year };
-    ["search", "fromDate", "toDate", "department", "designation", "month", "leaveTypeCode"].forEach((k) => {
+    ["empId", "fromDate", "toDate", "department", "designation", "month", "leaveTypeCode"].forEach((k) => {
       if (applied[k]) f[k] = applied[k];
     });
     return f;
   }, [applied]);
 
-  const { data = { data: [], totals: {} }, isLoading } = useLeaveManage(activeFilters);
+  const { data = { data: [], totals: {} }, isLoading, isError } = useLeaveManage(activeFilters);
   const rows = data.data;
   const totals = data.totals || {};
 
-  const isFiltered = !!(applied.search || applied.fromDate || applied.toDate ||
+  const isFiltered = !!(applied.empId || applied.fromDate || applied.toDate ||
     applied.department || applied.designation || applied.month || applied.leaveTypeCode);
 
   const onSearch = () => setApplied(draft);
@@ -128,10 +131,22 @@ export default function LeaveManagement() {
       {/* Filter panel */}
       <div className="card" style={{ padding: 16, marginBottom: 16 }}>
         <div className="form-grid" style={{ gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <Field label="Employee (ID / Name / Mobile)">
-            <Input value={draft.search} onChange={set("search")} placeholder="Search employee..."
-              onKeyDown={(e) => e.key === "Enter" && onSearch()} />
-          </Field>
+          <div>
+            <EmployeePicker
+              selected={draft.searchEmp}
+              showCard={false}
+              label="Employee (ID / Name / Mobile)"
+              required={false}
+              onSelect={(emp) => setDraft((d) => ({ ...d, searchEmp: emp, empId: emp?.empId || "" }))}
+            />
+            {draft.searchEmp && (
+              <div className="text-sm" style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+                <span>Selected: <strong>{draft.searchEmp.empName}</strong> (ID {draft.searchEmp.empId})</span>
+                <button type="button" className="btn btn--ghost btn--sm"
+                  onClick={() => setDraft((d) => ({ ...d, searchEmp: null, empId: "" }))}>Clear</button>
+              </div>
+            )}
+          </div>
           <Field label="Department">
             <Select value={draft.department} onChange={set("department")} placeholder="All departments" options={DEPARTMENTS} />
           </Field>
@@ -158,9 +173,13 @@ export default function LeaveManagement() {
         </div>
       </div>
 
-      <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15}
-        rowKey={(r) => r.empId} emptyTitle="No employees match these filters" emptyIcon="🌴"
-        pageSizeOptions={[15, 30, 50]} />
+      {isError ? (
+        <div className="card"><ErrorState message="Couldn't load Leave Management. Ensure the backend is running the latest build (it must expose GET /leave/manage)." /></div>
+      ) : (
+        <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15}
+          rowKey={(r) => r.empId} emptyTitle="No employees match these filters" emptyIcon="🌴"
+          pageSizeOptions={[15, 30, 50]} />
+      )}
 
       <LeaveDetailsDrawer emp={viewEmp} filters={activeFilters} onClose={() => setViewEmp(null)} />
 
