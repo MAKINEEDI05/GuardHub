@@ -36,6 +36,7 @@ export const QK = {
   leaveTypes: ["leave-types"],
   leaveBalances: (year, empId) => ["leave-balances", year, empId || "all"],
   leaveTransactions: (filters = {}) => ["leave-transactions", filters],
+  leaveManage: (filters = {}) => ["leave-manage", filters],
   leaveReport: (filters = {}) => ["leave-report", filters],
   leaveDashboard: (year, threshold) => ["leave-dashboard", year, threshold],
   odsRange: (from, to) => ["ods", from, to],

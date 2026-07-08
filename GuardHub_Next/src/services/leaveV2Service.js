@@ -51,9 +51,27 @@ export const leaveTxnService = {
     const { data } = await apiClient.post(ENDPOINTS.leaveTransactions, payload);
     return data?.data;
   },
+  async update(id, payload) {
+    const { data } = await apiClient.put(ENDPOINTS.leaveTransaction(id), payload);
+    return data?.data;
+  },
   async remove(id) {
     const { data } = await apiClient.delete(ENDPOINTS.leaveTransaction(id));
     return data;
+  },
+};
+
+// Unified Employee Leave Management dataset (filtered, server-side).
+// -> { year, types:[...], data:[{empId,empName,empDepartment,empDesignation,
+//      allocated,taken,remaining,byType:[...]}], totals:{...} }
+export const leaveManageService = {
+  async list(filters = {}) {
+    const { data } = await apiClient.get(ENDPOINTS.leaveManage, { params: clean(filters) });
+    return {
+      data: Array.isArray(data?.data) ? data.data : [],
+      totals: data?.totals || { employees: 0, allocated: 0, taken: 0, remaining: 0 },
+      types: Array.isArray(data?.types) ? data.types : [],
+    };
   },
 };
 

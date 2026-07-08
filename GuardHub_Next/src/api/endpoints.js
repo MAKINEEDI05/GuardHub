@@ -39,7 +39,8 @@ export const ENDPOINTS = {
   leaveBalances: "/leave/balances", // ?year&empId
   leaveAllocate: "/leave/balances/allocate", // POST { year, allocations[], empIds? }
   leaveTransactions: "/leave/transactions", // GET(filters) / POST record
-  leaveTransaction: (id) => `/leave/transactions/${id}`, // DELETE
+  leaveTransaction: (id) => `/leave/transactions/${id}`, // PUT edit / DELETE
+  leaveManage: "/leave/manage", // unified filtered summary (search/dept/desig/year/month/date/type)
   leaveReport: "/leave/reports/summary", // ?empId&month&year&leaveTypeCode&department&designation
   leaveMonthlySummary: "/leave/summary/monthly", // salary-ready
   leaveYearlySummary: "/leave/summary/yearly",
