@@ -13,7 +13,10 @@ import { toast } from "../store/toastStore";
 // so mutations invalidate all three prefixes plus the legacy "leaves" cache
 // (kept in sync by the backend dual-write).
 function invalidateLeave(qc) {
-  ["leave-types", "leave-balances", "leave-transactions", "leave-manage", "leave-report", "leaves"].forEach(
+  // Every cache that reads leave balances/types, so a change (incl. a quota edit
+  // that syncs allocations) refreshes Leave Management, Apply Leave, the drawer,
+  // View Leaves, reports and the dashboard cards.
+  ["leave-types", "leave-balances", "leave-transactions", "leave-manage", "leave-report", "leave-dashboard", "leaves"].forEach(
     (key) => qc.invalidateQueries({ queryKey: [key] })
   );
 }
@@ -41,7 +44,8 @@ export function useSaveLeaveType() {
     mutationFn: ({ id, payload }) =>
       id ? leaveTypeService.update(id, payload) : leaveTypeService.create(payload),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QK.leaveTypes });
+      // A quota change syncs allocations, so refresh every leave-balance cache.
+      invalidateLeave(qc);
       toast.success("Leave type saved.");
     },
     onError: (e) => toast.error(e.friendlyMessage || "Failed to save leave type."),
@@ -52,7 +56,7 @@ export function useDeleteLeaveType() {
   return useMutation({
     mutationFn: (id) => leaveTypeService.remove(id),
     onSuccess: () => {
-      qc.invalidateQueries({ queryKey: QK.leaveTypes });
+      invalidateLeave(qc);
       toast.success("Leave type deactivated.");
     },
     onError: (e) => toast.error(e.friendlyMessage || "Failed to deactivate."),

@@ -32,6 +32,21 @@ async function adjustBalanceUsed({ empId, year, leaveTypeCode, days, defaultQuot
   );
 }
 
+// Propagate a leave type's default quota to EVERY employee balance for that
+// type. Sets only `types.<CODE>.allocated` — `used` (historical), leave history
+// and transactions are never touched, so `remaining` (allocated - used) just
+// re-derives. Reusable across every entry point that changes a quota. Returns
+// the number of balance documents updated.
+async function syncLeaveTypeQuota(leaveTypeCode, allocated) {
+  const code = String(leaveTypeCode).toUpperCase();
+  const value = Math.max(0, Number(allocated) || 0);
+  const res = await LeaveBalance.updateMany(
+    {},
+    { $set: { [`types.${code}.allocated`]: value } }
+  );
+  return res.modifiedCount || 0;
+}
+
 // empId -> types object ({ CODE: { allocated, used } }) for a year. Optionally
 // restricted to a set of employee ids. Reused by buildYearRows, the report and
 // the unified manage endpoint so balance access lives in one place.
@@ -182,4 +197,5 @@ module.exports = {
   buildYearRows,
   getBalanceMap,
   bucket,
+  syncLeaveTypeQuota,
 };

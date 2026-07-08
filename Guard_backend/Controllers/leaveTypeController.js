@@ -1,4 +1,5 @@
 const LeaveType = require("../models/leaveTypeScheme");
+const { syncLeaveTypeQuota } = require("./leaveBalanceController");
 
 // Default categories seeded once on first use so a fresh install has something
 // to work with. Mirrors the MOM examples. Admins can add/edit/deactivate more
@@ -46,7 +47,9 @@ const createType = async (req, res) => {
       sortOrder: Number(req.body.sortOrder) || 0,
       active: req.body.active !== false,
     });
-    return res.status(201).json({ message: "Leave type created", data: doc });
+    // Propagate the initial quota to every employee balance for this type.
+    const synced = await syncLeaveTypeQuota(doc.code, doc.defaultAnnualQuota);
+    return res.status(201).json({ message: "Leave type created", data: doc, balancesSynced: synced });
   } catch (error) {
     if (error.code === 11000) {
       return res.status(409).json({ message: "A leave type with this code already exists" });
@@ -75,7 +78,16 @@ const updateType = async (req, res) => {
       runValidators: true,
     });
     if (!doc) return res.status(404).json({ message: "Leave type not found" });
-    return res.status(200).json({ message: "Leave type updated", data: doc });
+
+    // When the default quota changes, synchronize every employee balance's
+    // `allocated` for this type (used/history/transactions untouched). This is
+    // the fix for the reported bug and covers all update entry points (UI + API
+    // both hit this controller).
+    let balancesSynced;
+    if (update.defaultAnnualQuota !== undefined) {
+      balancesSynced = await syncLeaveTypeQuota(doc.code, doc.defaultAnnualQuota);
+    }
+    return res.status(200).json({ message: "Leave type updated", data: doc, balancesSynced });
   } catch (error) {
     console.error("Error updating leave type:", error);
     return res.status(500).json({ message: "Failed to update leave type" });
