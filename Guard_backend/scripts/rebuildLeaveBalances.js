@@ -32,6 +32,14 @@ const mongoose = require("mongoose");
     activeTypes.map((t) => `${t.code}=${t.defaultAnnualQuota || 0}`).join(", "));
 
   const coll = db.collection("leave_balances");
+  // Drop the old per-type unique index if it lingers from the previous shape,
+  // then ensure the new one.
+  try {
+    if ((await coll.indexes()).some((i) => i.name === "empId_1_year_1_leaveTypeCode_1")) {
+      await coll.dropIndex("empId_1_year_1_leaveTypeCode_1");
+      console.log("Dropped stale index empId_1_year_1_leaveTypeCode_1.");
+    }
+  } catch { /* ignore */ }
   await coll.createIndex({ empId: 1, year: 1 }, { unique: true }).catch(() => {});
 
   let written = 0;
