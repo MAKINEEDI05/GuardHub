@@ -9,6 +9,7 @@ import Icon from "../components/ui/Icon";
 import Drawer from "../components/ui/Drawer";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import LeaveEditDrawer from "../components/leave/LeaveEditDrawer";
+import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useLeaveTransactions, useDeleteLeaveTxn } from "../hooks/useLeaveV2";
 import { useEmployees } from "../hooks/useEmployees";
 import { formatDate, formatDateTime } from "../utils/date";
@@ -46,16 +47,27 @@ export default function ViewLeaves() {
   }, [leaves, term, empMap]);
 
   const columns = [
-    { key: "empId", header: "Emp ID", sortable: true, render: (l) => l.empId },
-    { key: "_name", header: "Employee", sortable: true, render: (l) => <span style={{ fontWeight: 600 }}>{l._name}</span> },
-    { key: "_dept", header: "Department", render: (l) => l._dept || "—" },
-    { key: "_desig", header: "Designation", render: (l) => l._desig || "—" },
+    {
+      key: "_name", header: "Employee", sortable: true, sortValue: (l) => l._name,
+      render: (l) => (
+        <EmployeeTableCell
+          emp={empMap.get(String(l.empId))}
+          empId={l.empId}
+        />
+      ),
+    },
     { key: "leaveTypeName", header: "Leave Type", render: (l) => <Badge status="leave">{l.leaveTypeName}</Badge> },
     { key: "shiftType", header: "Shift", render: (l) => l.shiftType || "—" },
     { key: "fromDate", header: "From", sortable: true, sortValue: (l) => new Date(l.fromDate).getTime(), render: (l) => formatDate(l.fromDate) },
     { key: "toDate", header: "To", render: (l) => formatDate(l.toDate) },
     { key: "dayType", header: "Duration", render: (l) => l.dayType || "—" },
     { key: "days", header: "Days", className: "num", sortable: true, render: (l) => <strong>{l.days}</strong> },
+    {
+      key: "reason", header: "Reason",
+      render: (l) => (
+        <span className="cell-truncate" title={l.reason || ""}>{l.reason || "—"}</span>
+      ),
+    },
     { key: "_actions", header: "Actions", className: "num", render: (l) => (
       <div style={{ display: "inline-flex", gap: 2 }}>
         <button className="btn btn--ghost btn--icon" title="View" aria-label="View leave" onClick={() => setViewTxn(l)}><Icon name="eye" size={16} /></button>
@@ -96,7 +108,7 @@ export default function ViewLeaves() {
         }
       />
       <div className="toolbar">
-        <SearchBar value={term} onChange={setTerm} placeholder="Search employee, department, type, reason..." />
+        <SearchBar value={term} onChange={setTerm} placeholder="Search by employee, type, reason..." />
       </div>
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15}
         emptyTitle="No leave records found" emptyIcon="🌴" pageSizeOptions={[15, 30, 50]} />

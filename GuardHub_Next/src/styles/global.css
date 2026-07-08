@@ -444,6 +444,17 @@ h1, h2, h3, h4, h5 {
 .emp-cell__name { font-weight: 600; color: var(--text); }
 .emp-cell__sub { font-size: var(--fs-small); color: var(--text-muted); }
 
+/* Single-line truncated cell (e.g. Leave reason). Full text shows via the
+   native title tooltip on hover — keeps table width bounded. */
+.cell-truncate {
+  display: inline-block;
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  vertical-align: middle;
+}
+
 /* Employee photo hover preview */
 .emp-hover { display: inline-flex; flex-shrink: 0; }
 .emp-hover__thumb { cursor: zoom-in; }
