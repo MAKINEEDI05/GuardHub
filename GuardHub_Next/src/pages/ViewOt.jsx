@@ -6,13 +6,15 @@ import SearchBar from "../components/ui/SearchBar";
 import DataTable from "../components/ui/DataTable";
 import Badge from "../components/ui/Badge";
 import Icon from "../components/ui/Icon";
+import Drawer from "../components/ui/Drawer";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { Select } from "../components/ui/Field";
 import EmployeeTableCell from "../components/EmployeeTableCell";
+import OtEditDrawer from "../components/ot/OtEditDrawer";
 import { useOts, useDeleteOt, useUpdateOt } from "../hooks/useOts";
 import { useEmployees } from "../hooks/useEmployees";
 import { OT_STATUSES } from "../utils/constants";
-import { formatDate } from "../utils/date";
+import { formatDate, formatDateTime } from "../utils/date";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 function statusTone(s) {
@@ -29,6 +31,8 @@ export default function ViewOt() {
   const update = useUpdateOt();
   const [term, setTerm] = useState("");
   const [confirm, setConfirm] = useState(null);
+  const [viewOt, setViewOt] = useState(null);
+  const [editOt, setEditOt] = useState(null);
 
   // empId -> employee master record, only to resolve the photo (OT already
   // denormalises employeeName/designation).
@@ -80,11 +84,13 @@ export default function ViewOt() {
       ),
     },
     {
-      key: "_actions", header: "", className: "num",
+      key: "_actions", header: "Actions", className: "num",
       render: (o) => (
-        <button className="btn btn--ghost btn--icon" title="Delete" onClick={() => setConfirm(o)}>
-          <Icon name="trash" size={16} />
-        </button>
+        <div style={{ display: "inline-flex", gap: 2 }}>
+          <button className="btn btn--ghost btn--icon" title="View" aria-label="View OT" onClick={() => setViewOt(o)}><Icon name="eye" size={16} /></button>
+          <button className="btn btn--ghost btn--icon" title="Edit" aria-label="Edit OT" onClick={() => setEditOt(o)}><Icon name="edit" size={16} /></button>
+          <button className="btn btn--ghost btn--icon" title="Delete" aria-label="Delete OT" onClick={() => setConfirm(o)}><Icon name="trash" size={16} /></button>
+        </div>
       ),
     },
   ];
@@ -125,6 +131,47 @@ export default function ViewOt() {
         <SearchBar value={term} onChange={setTerm} placeholder="Search by employee, location, status..." />
       </div>
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15} emptyTitle="No OT records found" emptyIcon="⏰" />
+
+      {/* View (read-only) */}
+      <Drawer open={!!viewOt} title="OT Details" onClose={() => setViewOt(null)} width={520}>
+        {viewOt && (() => {
+          const e = empMap.get(String(viewOt.employeeId)) || {};
+          const dept = viewOt.department || e.empDepartment;
+          const desig = viewOt.designation || e.empDesignation;
+          return (
+            <div className="stack" style={{ gap: 16 }}>
+              <section>
+                <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 6 }}>Employee Information</div>
+                <div style={{ fontSize: 16, fontWeight: 700 }}>{viewOt.employeeName || e.empName || `ID ${viewOt.employeeId}`}</div>
+                <div className="text-sm muted">ID {viewOt.employeeId}{dept ? ` · ${dept}` : ""}{desig ? ` · ${desig}` : ""}</div>
+              </section>
+              <section>
+                <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 6 }}>OT Information</div>
+                <dl className="detail-grid">
+                  <Row k="Current Shift" v={viewOt.currentShift || "—"} />
+                  <Row k="Additional Shift" v={viewOt.additionalShift || "—"} />
+                  <Row k="Duration" v={viewOt.workingDuration || "—"} />
+                  <Row k="Location" v={viewOt.location || "—"} />
+                  <Row k="From Date" v={formatDate(viewOt.fromDate)} />
+                  <Row k="To Date" v={formatDate(viewOt.toDate)} />
+                  <Row k="Status" v={viewOt.status || "—"} />
+                  <Row k="Created Date" v={formatDateTime(viewOt.createdAt)} />
+                </dl>
+              </section>
+              {(viewOt.reason || viewOt.remarks) && (
+                <section>
+                  <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 6 }}>Reason & Remarks</div>
+                  <div>{viewOt.reason || "—"}</div>
+                  {viewOt.remarks && <div className="text-sm muted" style={{ marginTop: 4 }}>{viewOt.remarks}</div>}
+                </section>
+              )}
+            </div>
+          );
+        })()}
+      </Drawer>
+
+      <OtEditDrawer ot={editOt} onClose={() => setEditOt(null)} />
+
       <ConfirmDialog
         open={!!confirm}
         title="Delete OT record?"
@@ -135,5 +182,14 @@ export default function ViewOt() {
         onConfirm={async () => { await del.mutateAsync(confirm._id); setConfirm(null); }}
       />
     </>
+  );
+}
+
+function Row({ k, v }) {
+  return (
+    <div style={{ display: "flex", justifyContent: "space-between", gap: 12, padding: "6px 0", borderBottom: "1px solid var(--border)" }}>
+      <span className="text-sm muted">{k}</span>
+      <span style={{ textAlign: "right" }}>{v}</span>
+    </div>
   );
 }

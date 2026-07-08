@@ -38,6 +38,7 @@ export const ENDPOINTS = {
   applyOd: "/od/apply-od",
   odsByRange: "/od/get-ods", // ?fromDate&toDate
   odByEmp: (empId) => `/od/get-od-byid/${empId}`,
+  updateOd: (id) => `/od/update-od-byid/${id}`,
   deleteOd: (id) => `/od/delete-od-byid/${id}`,
 
   // OT — mounted at /ot

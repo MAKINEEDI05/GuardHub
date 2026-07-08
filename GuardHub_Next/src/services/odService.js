@@ -26,6 +26,11 @@ export const odService = {
     }
   },
 
+  async update(id, payload) {
+    const { data } = await apiClient.put(ENDPOINTS.updateOd(id), payload);
+    return data;
+  },
+
   async remove(id) {
     const { data } = await apiClient.delete(ENDPOINTS.deleteOd(id));
     return data;
