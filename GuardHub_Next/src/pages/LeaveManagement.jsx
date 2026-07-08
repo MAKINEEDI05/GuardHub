@@ -26,6 +26,10 @@ const emptyDraft = (year) => ({
   year, month: "", leaveTypeCode: "",
 });
 
+// Ensure a (possibly off-list) value is selectable so a disabled Select still
+// shows it.
+const withValue = (opts, val) => (val && !opts.includes(val) ? [...opts, val] : opts);
+
 export default function LeaveManagement() {
   const years = recentYears();
   const qc = useQueryClient();
@@ -157,21 +161,37 @@ export default function LeaveManagement() {
               showCard={false}
               label="Employee (ID / Name / Mobile)"
               required={false}
-              onSelect={(emp) => setDraft((d) => ({ ...d, searchEmp: emp, empId: emp?.empId || "" }))}
+              onSelect={(emp) =>
+                setDraft((d) => ({
+                  ...d,
+                  searchEmp: emp,
+                  empId: emp?.empId || "",
+                  // A specific employee fixes their department & designation, so
+                  // fill (and lock) those filters instead of asking again.
+                  department: emp?.empDepartment || "",
+                  designation: emp?.empDesignation || "",
+                }))
+              }
             />
             {draft.searchEmp && (
               <div className="text-sm" style={{ marginTop: 6, display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-                <span>Selected: <strong>{draft.searchEmp.empName}</strong> (ID {draft.searchEmp.empId})</span>
+                <span>
+                  Selected: <strong>{draft.searchEmp.empName}</strong> (ID {draft.searchEmp.empId})
+                  {draft.searchEmp.empDepartment ? ` · ${draft.searchEmp.empDepartment}` : ""}
+                  {draft.searchEmp.empDesignation ? ` · ${draft.searchEmp.empDesignation}` : ""}
+                </span>
                 <button type="button" className="btn btn--ghost btn--sm"
-                  onClick={() => setDraft((d) => ({ ...d, searchEmp: null, empId: "" }))}>Clear</button>
+                  onClick={() => setDraft((d) => ({ ...d, searchEmp: null, empId: "", department: "", designation: "" }))}>Clear</button>
               </div>
             )}
           </div>
-          <Field label="Department">
-            <Select value={draft.department} onChange={set("department")} placeholder="All departments" options={DEPARTMENTS} />
+          <Field label="Department" hint={draft.searchEmp ? "Set by selected employee" : undefined}>
+            <Select value={draft.department} onChange={set("department")} placeholder="All departments"
+              options={withValue(DEPARTMENTS, draft.department)} disabled={!!draft.searchEmp} />
           </Field>
-          <Field label="Designation">
-            <Select value={draft.designation} onChange={set("designation")} placeholder="All designations" options={DESIGNATIONS} />
+          <Field label="Designation" hint={draft.searchEmp ? "Set by selected employee" : undefined}>
+            <Select value={draft.designation} onChange={set("designation")} placeholder="All designations"
+              options={withValue(DESIGNATIONS, draft.designation)} disabled={!!draft.searchEmp} />
           </Field>
           <Field label="Leave Type">
             <Select value={draft.leaveTypeCode} onChange={set("leaveTypeCode")} placeholder="All types"
