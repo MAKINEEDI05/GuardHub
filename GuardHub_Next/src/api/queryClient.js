@@ -19,30 +19,17 @@ export const queryClient = new QueryClient({
 // Stable query keys so caches are shared and invalidations are precise.
 export const QK = {
   employees: ["employees"],
-  employeeFilterOptions: ["employee-filter-options"],
-  employee: (id) => ["employee", String(id)],
   rosters: ["rosters"],
-  rostersPaged: (p = {}) => [
-    "rosters",
-    "paged",
-    p.page || 1,
-    p.limit || 20,
-    p.search || "",
-    p.shift || "",
-    p.department || "",
-  ],
   leavesRange: (from, to) => ["leaves", from, to],
   // Leave Management v2
   leaveTypes: ["leave-types"],
   leaveBalances: (year, empId) => ["leave-balances", year, empId || "all"],
   leaveTransactions: (filters = {}) => ["leave-transactions", filters],
   leaveManage: (filters = {}) => ["leave-manage", filters],
-  leaveReport: (filters = {}) => ["leave-report", filters],
   leaveDashboard: (year, threshold) => ["leave-dashboard", year, threshold],
   odsRange: (from, to) => ["ods", from, to],
   ot: ["ot"],
   attendanceByDate: (date) => ["attendance", date],
-  monthwise: (id, from, to) => ["monthwise", String(id), from, to],
   monthwiseSummary: (from, to) => ["monthwise-summary", from, to],
   musterRoll: (filters = {}) => ["muster-roll", filters],
 };

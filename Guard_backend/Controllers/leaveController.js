@@ -71,14 +71,12 @@ const getLeaveByEmpId = async (req, res) => {
 };
 // update leave by object id
 const updateLeaveById = async (req, res) => {
-  console.log("id", req.params.id);
   try {
     const updatedLeave = await Leave.findOneAndUpdate(
       { _id: req.params.id },
       req.body,
       { new: true, runValidators: true }
     );
-    console.log(updatedLeave);
     if (!updatedLeave) {
       return res
         .status(404)

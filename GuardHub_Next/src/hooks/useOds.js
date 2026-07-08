@@ -33,18 +33,6 @@ export function useApplyOd() {
   });
 }
 
-export function useUpdateOd() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, payload }) => odService.update(id, payload),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ods"] });
-      toast.success("OD updated.");
-    },
-    onError: (e) => toast.error(e.friendlyMessage || "Failed to update OD."),
-  });
-}
-
 export function useDeleteOd() {
   const qc = useQueryClient();
   return useMutation({

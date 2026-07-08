@@ -21,14 +21,6 @@ export function useAttendanceByDate(date, enabled = true) {
   });
 }
 
-export function useMonthwise(empId, startDate, endDate, enabled = true) {
-  return useQuery({
-    queryKey: QK.monthwise(empId, startDate, endDate),
-    queryFn: () => reportService.monthwise(empId, startDate, endDate),
-    enabled: !!empId && !!startDate && !!endDate && enabled,
-  });
-}
-
 // All-employees month-wise summary. No employee selection required — loads
 // every employee's attendance for the date range so the page can show the
 // full table by default and filter client-side.

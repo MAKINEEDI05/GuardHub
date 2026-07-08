@@ -12,11 +12,6 @@ export const attendanceService = {
     return Array.isArray(data?.data) ? data.data : [];
   },
 
-  async byEmp(empId) {
-    const { data } = await apiClient.get(ENDPOINTS.attendanceByEmp(empId));
-    return Array.isArray(data) ? data : [];
-  },
-
   // Attendance Muster Roll (per-day grid + monthly summary). All filtering is
   // server-side. -> { year, month, monthName, dim, dayColumns, data:[...] }
   async musterRoll(filters = {}) {

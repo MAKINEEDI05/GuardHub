@@ -1,10 +1,6 @@
 // Option sets used across forms. These mirror exactly what the backend
 // validates/accepts — do not change casing without checking the controllers.
 
-// Leave types (legacy fallback list). Leave Management v2 loads the real,
-// configurable set from the backend leave_types master via useLeaveTypes().
-export const LEAVE_TYPES = ["Casual Leave", "Sick Leave", "Earned Leave"];
-
 // Month options for report/balance filters ({ value: 1..12, label }).
 export const MONTHS = [
   "January", "February", "March", "April", "May", "June",

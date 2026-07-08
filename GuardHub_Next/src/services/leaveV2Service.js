@@ -76,19 +76,6 @@ export const leaveManageService = {
 };
 
 export const leaveReportService = {
-  // -> { year, data:[...rows], summary:{...} }
-  async summary(filters = {}) {
-    const { data } = await apiClient.get(ENDPOINTS.leaveReport, {
-      params: clean(filters),
-    });
-    return { data: Array.isArray(data?.data) ? data.data : [], summary: data?.summary || {} };
-  },
-  async monthly(filters = {}) {
-    const { data } = await apiClient.get(ENDPOINTS.leaveMonthlySummary, {
-      params: clean(filters),
-    });
-    return Array.isArray(data?.data) ? data.data : [];
-  },
   // -> { onLeaveToday:[...], onLeaveTodayCount, lowBalance:[...], lowBalanceCount }
   async dashboardOverview(year, threshold) {
     const { data } = await apiClient.get(ENDPOINTS.leaveDashboardOverview, {

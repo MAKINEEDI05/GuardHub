@@ -6,7 +6,6 @@ const {
 
 // Add new od request
 const addOd = async (req, res) => {
-  console.log("Received body:", req.body);
   try {
     const {
       empId,

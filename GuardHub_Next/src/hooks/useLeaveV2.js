@@ -127,15 +127,6 @@ export function useDeleteLeaveTxn() {
   });
 }
 
-/* ---- Report ---- */
-export function useLeaveReport(filters = {}) {
-  return useQuery({
-    queryKey: QK.leaveReport(filters),
-    queryFn: () => leaveReportService.summary(filters),
-    placeholderData: keepPreviousData,
-  });
-}
-
 /* ---- Dashboard overview (on-leave-today + low-balance) ---- */
 export function useLeaveDashboardOverview(year, threshold) {
   return useQuery({
