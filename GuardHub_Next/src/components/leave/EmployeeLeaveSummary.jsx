@@ -25,6 +25,12 @@ export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, proj
   const ot = computeOtSummary(otRecords);
   const od = computeOdSummary(odRecords);
 
+  // Comp Off comes through the balance as the COMP type: allocated = earned from
+  // approved OT (derived server-side), used = Comp Off leaves taken.
+  const comp = byType.find((b) => b.leaveTypeCode === "COMP");
+  const compAvail = comp ? comp.remaining : ot.compOff;
+  const compSelected = selectedTypeCode === "COMP";
+
   const lastLeave = mostRecent(leaveTxns, "fromDate");
   const lastOt = mostRecent(otRecords, "fromDate");
   const lastOd = mostRecent(odRecords, "empFromDate");
@@ -77,10 +83,20 @@ export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, proj
       {/* OT + OD Summary (side by side) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
         <div className="card" style={{ padding: 12 }}>
-          <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 8 }}>OT Summary</div>
-          <MiniRow label="Entries" value={ot.entries} />
+          <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 8 }}>OT / Comp Off</div>
+          <MiniRow label="OT Entries" value={ot.entries} />
           <MiniRow label="OT Days" value={ot.totalDays} />
-          <MiniRow label="Comp Off" value={ot.compOff} hint="from approved OT" strong />
+          <MiniRow label="Earned" value={comp ? comp.allocated : ot.compOff} hint="approved OT" />
+          <MiniRow label="Used" value={comp ? comp.used : 0} />
+          <MiniRow
+            label="Comp Off Avail"
+            strong
+            value={
+              compSelected && projectedDays != null
+                ? `${compAvail} → ${compAvail - projectedDays}`
+                : compAvail
+            }
+          />
         </div>
         <div className="card" style={{ padding: 12 }}>
           <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 8 }}>OD Summary</div>

@@ -9,6 +9,9 @@ const DEFAULT_TYPES = [
   { code: "SPL", name: "Special Leave", defaultAnnualQuota: 6, isPaid: true, sortOrder: 2 },
   { code: "SUM", name: "Summer Leave", defaultAnnualQuota: 4, isPaid: true, sortOrder: 3 },
   { code: "HOL", name: "Holiday Leave", defaultAnnualQuota: 2, isPaid: true, sortOrder: 4 },
+  // Comp Off: allocation is EARNED from approved OT (not a fixed quota), so its
+  // defaultAnnualQuota stays 0 — the balance read derives "allocated" from OT.
+  { code: "COMP", name: "Comp Off", defaultAnnualQuota: 0, isPaid: true, sortOrder: 5, description: "Compensatory leave earned from approved overtime." },
 ];
 
 async function seedDefaultsIfEmpty() {

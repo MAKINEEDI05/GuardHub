@@ -15,6 +15,7 @@ const DEFAULTS = [
   { code: "SPL", name: "Special Leave", defaultAnnualQuota: 6, isPaid: true, sortOrder: 2 },
   { code: "SUM", name: "Summer Leave", defaultAnnualQuota: 4, isPaid: true, sortOrder: 3 },
   { code: "HOL", name: "Holiday Leave", defaultAnnualQuota: 2, isPaid: true, sortOrder: 4 },
+  { code: "COMP", name: "Comp Off", defaultAnnualQuota: 0, isPaid: true, sortOrder: 5, description: "Compensatory leave earned from approved overtime." },
 ];
 
 (async () => {

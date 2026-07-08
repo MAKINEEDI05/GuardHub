@@ -1,6 +1,7 @@
 const LeaveBalance = require("../models/leaveBalanceScheme");
 const LeaveType = require("../models/leaveTypeScheme");
 const employe = require("../models/profileScheme");
+const Ot = require("../models/otScheme");
 const { ACTIVE_FILTER, getActiveEmployeeIds } = require("../utils/employeeRef");
 
 // One balance document per (empId, year) now holds every type under `types`.
@@ -9,6 +10,39 @@ const { ACTIVE_FILTER, getActiveEmployeeIds } = require("../utils/employeeRef");
 
 // Safe read of a single type bucket from a balance doc's `types` object.
 const bucket = (types, code) => (types && types[code]) || { allocated: 0, used: 0 };
+
+// Comp Off: leave earned from completed (APPROVED) overtime. Its "allocated" is
+// NOT a fixed quota — it is derived from OT — so it is computed on the balance
+// read path (never stored), and `used` is the ordinary per-type debit that
+// recordLeave writes when a "Comp Off" leave is applied. remaining = earned - used.
+const COMP_CODE = "COMP";
+
+// OT working-duration -> days (the OT schema stores a coarse enum, not a number).
+const OT_DURATION_DAYS_STAGE = {
+  $switch: {
+    branches: [
+      { case: { $eq: ["$workingDuration", "4 Hours (Half Day)"] }, then: 0.5 },
+      { case: { $eq: ["$workingDuration", "8 Hours (Full Day)"] }, then: 1 },
+      { case: { $eq: ["$workingDuration", "Double Shift"] }, then: 2 },
+    ],
+    default: 1,
+  },
+};
+
+// empId -> Comp Off days EARNED in `year` (sum of approved OT days). One
+// aggregation, reused by every balance read so Comp Off stays identical across
+// Apply Leave, Leave Management, reports, etc. (no duplicated calculation).
+async function compOffEarnedMap(year, empIds) {
+  const match = { status: "Approved" };
+  if (Array.isArray(empIds) && empIds.length) match.employeeId = { $in: empIds };
+  const agg = await Ot.aggregate([
+    { $match: match },
+    { $addFields: { _yr: { $year: "$fromDate" } } },
+    { $match: { _yr: year } },
+    { $group: { _id: "$employeeId", days: { $sum: OT_DURATION_DAYS_STAGE } } },
+  ]);
+  return new Map(agg.map((a) => [a._id, a.days]));
+}
 
 // --- Shared ledger mutation ---------------------------------------------------
 // Adjust an employee's `used` for a (year, type) by +days (record) or -days
@@ -70,10 +104,12 @@ async function buildYearRows(year, empIdFilter) {
   const list =
     empIdFilter != null ? employees.filter((e) => e.empId === empIdFilter) : employees;
 
-  const balMap = await getBalanceMap(
-    year,
-    empIdFilter != null ? [empIdFilter] : list.map((e) => e.empId)
-  );
+  const ids = empIdFilter != null ? [empIdFilter] : list.map((e) => e.empId);
+  const hasComp = types.some((t) => t.code === COMP_CODE);
+  const [balMap, compMap] = await Promise.all([
+    getBalanceMap(year, ids),
+    hasComp ? compOffEarnedMap(year, ids) : Promise.resolve(new Map()),
+  ]);
 
   return list
     .map((e) => {
@@ -84,7 +120,8 @@ async function buildYearRows(year, empIdFilter) {
       // low-balance widget) filter on allocated > 0 themselves.
       const byType = types.map((t) => {
         const b = bucket(typesObj, t.code);
-        const allocated = b.allocated || 0;
+        // Comp Off "allocated" is EARNED from approved OT (derived, not stored).
+        const allocated = t.code === COMP_CODE ? compMap.get(e.empId) || 0 : b.allocated || 0;
         const used = b.used || 0;
         return {
           leaveTypeCode: t.code,
@@ -198,4 +235,6 @@ module.exports = {
   getBalanceMap,
   bucket,
   syncLeaveTypeQuota,
+  compOffEarnedMap,
+  COMP_CODE,
 };

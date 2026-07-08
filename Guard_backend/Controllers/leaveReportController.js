@@ -2,7 +2,7 @@ const LeaveTransaction = require("../models/leaveTransactionScheme");
 const LeaveType = require("../models/leaveTypeScheme");
 const employe = require("../models/profileScheme");
 const { ACTIVE_FILTER } = require("../utils/employeeRef");
-const { buildYearRows, getBalanceMap, bucket } = require("./leaveBalanceController");
+const { buildYearRows, getBalanceMap, bucket, compOffEarnedMap, COMP_CODE } = require("./leaveBalanceController");
 
 const escapeRx = (s) => String(s).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
@@ -90,17 +90,22 @@ const getLeaveManagement = async (req, res) => {
     ]);
     const takenMap = new Map(takenAgg.map((t) => [`${t._id.empId}|${t._id.code}`, t.taken]));
 
-    const balMap = await getBalanceMap(year, empIds);
-
     // Which type columns to include (all, or just the filtered one).
     const typeFilter = req.query.leaveTypeCode ? String(req.query.leaveTypeCode).toUpperCase() : null;
     const cols = typeFilter ? activeTypes.filter((t) => t.code === typeFilter) : activeTypes;
+
+    const hasComp = cols.some((t) => t.code === COMP_CODE);
+    const [balMap, compMap] = await Promise.all([
+      getBalanceMap(year, empIds),
+      hasComp ? compOffEarnedMap(year, empIds) : Promise.resolve(new Map()),
+    ]);
 
     const data = employees
       .map((e) => {
         const typesObj = balMap.get(e.empId) || {};
         const byType = cols.map((t) => {
-          const allocated = bucket(typesObj, t.code).allocated || 0;
+          // Comp Off allocated is EARNED from approved OT (derived), not stored.
+          const allocated = t.code === COMP_CODE ? compMap.get(e.empId) || 0 : bucket(typesObj, t.code).allocated || 0;
           const used = takenMap.get(`${e.empId}|${t.code}`) || 0;
           return {
             leaveTypeCode: t.code,
