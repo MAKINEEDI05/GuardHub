@@ -6,13 +6,6 @@ import { ENDPOINTS } from "../api/endpoints";
 // NOTE: the legacy frontend also called /leaves/remaining-cl/:empId — that
 // route does NOT exist in the backend, so it is omitted here.
 export const reportService = {
-  async monthwise(empId, startDate, endDate) {
-    const { data } = await apiClient.get(ENDPOINTS.monthwiseReport(empId), {
-      params: { startDate, endDate },
-    });
-    return data?.summary || null;
-  },
-
   // All-employees summary over a date range, computed server-side in one call.
   // Returns { data: rows[], totals, total, startDate, endDate, totalDays }.
   // The page fetches the full filtered set and paginates client-side (the

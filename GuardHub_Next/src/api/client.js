@@ -39,10 +39,16 @@ apiClient.interceptors.response.use(
     if (error.code === "ECONNABORTED") {
       message = "The request timed out. Check your connection and retry.";
     } else if (error.response) {
-      message =
-        error.response.data?.message ||
-        error.response.data?.error ||
-        `Request failed (${error.response.status}).`;
+      // Surface the ACTUAL backend message (e.g. a validation reason or
+      // "Insufficient leave balance"), including a validation `errors` array or
+      // a distinct low-level `error` cause, instead of a generic fallback.
+      const d = error.response.data || {};
+      message = d.message || d.error || `Request failed (${error.response.status}).`;
+      if (Array.isArray(d.errors) && d.errors.length) {
+        message += `: ${d.errors.join(", ")}`;
+      } else if (d.error && d.message && String(d.error) !== String(d.message)) {
+        message += ` (${d.error})`;
+      }
     } else if (error.request) {
       message = "Cannot reach the server. Is the backend running?";
     }

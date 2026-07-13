@@ -13,6 +13,8 @@ export default function EmployeePicker({
   onSelect,
   placeholder = "Search by ID, name, mobile...",
   showCard = true,
+  label = "Search Employee",
+  required = true,
 }) {
   const { data: employees = [], isLoading, isError, refetch } = useEmployees();
   const [term, setTerm] = useState("");
@@ -48,7 +50,7 @@ export default function EmployeePicker({
   return (
     <div className="field" ref={boxRef} style={{ position: "relative" }}>
       <label className="field__label">
-        Search Employee <span className="req">*</span>
+        {label} {required && <span className="req">*</span>}
       </label>
       <input
         className="input"

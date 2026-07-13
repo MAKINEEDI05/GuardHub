@@ -11,7 +11,10 @@ const Employees = lazy(() => import("../pages/Employees"));
 const Roster = lazy(() => import("../pages/Roster"));
 const DayWiseReport = lazy(() => import("../pages/DayWiseReport"));
 const MonthWiseReport = lazy(() => import("../pages/MonthWiseReport"));
+const AttendanceMusterRoll = lazy(() => import("../pages/AttendanceMusterRoll"));
+const LeaveManagement = lazy(() => import("../pages/LeaveManagement"));
 const ViewLeaves = lazy(() => import("../pages/ViewLeaves"));
+const LeaveTypes = lazy(() => import("../pages/LeaveTypes"));
 const ViewOd = lazy(() => import("../pages/ViewOd"));
 const ViewOt = lazy(() => import("../pages/ViewOt"));
 const ApplyLeave = lazy(() => import("../pages/ApplyLeave"));
@@ -36,7 +39,13 @@ export default function AppRouter() {
         <Route path="/roster" element={<Roster />} />
         <Route path="/reports/day" element={<DayWiseReport />} />
         <Route path="/reports/month" element={<MonthWiseReport />} />
-        <Route path="/leaves" element={<ViewLeaves />} />
+        <Route path="/reports/muster" element={<AttendanceMusterRoll />} />
+        <Route path="/leaves" element={<LeaveManagement />} />
+        <Route path="/leaves/view" element={<ViewLeaves />} />
+        <Route path="/leaves/types" element={<LeaveTypes />} />
+        {/* Consolidated into /leaves — redirect old deep links */}
+        <Route path="/leaves/balances" element={<Navigate to="/leaves" replace />} />
+        <Route path="/leaves/report" element={<Navigate to="/leaves" replace />} />
         <Route path="/od" element={<ViewOd />} />
         <Route path="/ot" element={<ViewOt />} />
         <Route path="/apply/leave" element={<ApplyLeave />} />

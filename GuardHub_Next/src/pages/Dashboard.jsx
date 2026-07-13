@@ -10,7 +10,8 @@ import { useRosters } from "../hooks/useRoster";
 import { useLeaves } from "../hooks/useLeaves";
 import { useOds } from "../hooks/useOds";
 import { useOts } from "../hooks/useOts";
-import { formatDate, formatDateTime } from "../utils/date";
+import LeaveDashboardCards from "../components/leave/LeaveDashboardCards";
+import { formatDate } from "../utils/date";
 
 // All KPIs come from real backend collections — no fabricated metrics.
 const KPI_META = [
@@ -90,6 +91,11 @@ export default function Dashboard() {
         {KPI_META.map((m) => (
           <Kpi key={m.key} meta={m} value={counts[m.key]} loading={loading[m.key]} />
         ))}
+      </div>
+
+      {/* Operational leave visibility */}
+      <div className="mb-4">
+        <LeaveDashboardCards />
       </div>
 
       <div className="stack" style={{ gap: 16 }}>

@@ -17,12 +17,20 @@ export const NAV_SECTIONS = [
     items: [
       { to: "/reports/day", label: "Day Wise Report", icon: "calendar-day" },
       { to: "/reports/month", label: "Month Wise Report", icon: "calendar-month" },
+      { to: "/reports/muster", label: "Attendance Muster Roll", icon: "calendar-day" },
+    ],
+  },
+  {
+    title: "Leave Management",
+    items: [
+      { to: "/leaves", label: "Leave Management", icon: "leave", end: true },
+      { to: "/leaves/types", label: "Leave Types", icon: "dashboard" },
     ],
   },
   {
     title: "Records",
     items: [
-      { to: "/leaves", label: "View Leaves", icon: "leave" },
+      { to: "/leaves/view", label: "View Leaves", icon: "calendar-month" },
       { to: "/od", label: "View OD", icon: "od" },
       { to: "/ot", label: "View OT", icon: "ot" },
     ],

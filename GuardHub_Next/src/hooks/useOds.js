@@ -12,6 +12,15 @@ export function useOds(fromDate = WIDE.from, toDate = WIDE.to) {
   });
 }
 
+// All OD records for a single employee (reuses GET /od/get-od-byid).
+export function useOdByEmp(empId) {
+  return useQuery({
+    queryKey: ["ods", "emp", String(empId ?? "")],
+    queryFn: () => odService.byEmp(empId),
+    enabled: !!empId,
+  });
+}
+
 export function useApplyOd() {
   const qc = useQueryClient();
   return useMutation({

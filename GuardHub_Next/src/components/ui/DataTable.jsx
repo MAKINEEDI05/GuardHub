@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { EmptyState, TableSkeleton } from "./States";
 
 // Lightweight, dependency-free data table with optional client-side sorting
@@ -18,6 +18,8 @@ export default function DataTable({
   emptyMessage,
   emptyIcon,
   compact,
+  onSortedRows, // optional: receives the full filtered+sorted rows (all pages)
+                // so callers can export exactly what the table shows.
 }) {
   const [sort, setSort] = useState({ key: null, dir: "asc" });
   const [page, setPage] = useState(1);
@@ -43,6 +45,12 @@ export default function DataTable({
     });
     return copy;
   }, [rows, sort, columns]);
+
+  // Surface the filtered+sorted rows (before pagination) so the parent can
+  // export exactly what the table displays, in the current sort order.
+  useEffect(() => {
+    onSortedRows?.(sorted);
+  }, [sorted, onSortedRows]);
 
   const totalPages = paginate ? Math.max(1, Math.ceil(sorted.length / effectiveSize)) : 1;
   const currentPage = Math.min(page, totalPages);
