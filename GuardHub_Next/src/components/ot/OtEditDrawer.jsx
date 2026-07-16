@@ -4,12 +4,13 @@ import Button from "../ui/Button";
 import DateField from "../forms/DateField";
 import { Field, Input, Select } from "../ui/Field";
 import { useUpdateOt } from "../../hooks/useOts";
-import { OT_SHIFTS, OT_DURATIONS, OT_STATUSES } from "../../utils/constants";
+import { OT_SHIFTS, OT_DURATIONS } from "../../utils/constants";
 import { toYmd } from "../../utils/date";
 
 // Edit an existing OT record in place. Editable: Current/Additional Shift,
-// Duration, Location, From/To dates, Status. Reuses the same validation rules as
-// Apply OT. Reason/remarks are left untouched (partial update). Employee fixed.
+// Duration, Location, From/To dates. Reuses the same validation rules as Apply
+// OT. Reason/remarks are left untouched (partial update). Employee fixed. (There
+// is no approval status — an admin-entered OT is already final.)
 //
 // props: { ot: record | null, onClose }
 export default function OtEditDrawer({ ot, onClose }) {
@@ -27,7 +28,6 @@ export default function OtEditDrawer({ ot, onClose }) {
         location: ot.location || "",
         fromDate: toYmd(ot.fromDate),
         toDate: toYmd(ot.toDate),
-        status: ot.status || "Pending",
       });
       setErrors({});
     }
@@ -60,7 +60,6 @@ export default function OtEditDrawer({ ot, onClose }) {
           location: form.location.trim(),
           fromDate: form.fromDate,
           toDate: form.toDate,
-          status: form.status,
         },
       });
       onClose();
@@ -95,9 +94,7 @@ export default function OtEditDrawer({ ot, onClose }) {
             <Field label="Duration" required error={errors.workingDuration}>
               <Select value={form.workingDuration} onChange={set("workingDuration")} options={OT_DURATIONS} placeholder="Select duration" />
             </Field>
-            <Field label="Status" required error={errors.status}>
-              <Select value={form.status} onChange={set("status")} options={OT_STATUSES} placeholder="Select status" />
-            </Field>
+            <div />
             <DateField label="From Date" required value={form.fromDate} onChange={set("fromDate")} error={errors.fromDate} />
             <DateField label="To Date" required value={form.toDate} min={form.fromDate} onChange={set("toDate")} error={errors.toDate} />
           </div>

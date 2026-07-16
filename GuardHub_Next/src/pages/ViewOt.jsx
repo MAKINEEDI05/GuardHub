@@ -8,27 +8,19 @@ import Badge from "../components/ui/Badge";
 import Icon from "../components/ui/Icon";
 import Drawer from "../components/ui/Drawer";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
-import { Select } from "../components/ui/Field";
 import EmployeeTableCell from "../components/EmployeeTableCell";
 import OtEditDrawer from "../components/ot/OtEditDrawer";
-import { useOts, useDeleteOt, useUpdateOt } from "../hooks/useOts";
+import { useOts, useDeleteOt } from "../hooks/useOts";
 import { useEmployees } from "../hooks/useEmployees";
-import { OT_STATUSES } from "../utils/constants";
 import { formatDate, formatDateTime } from "../utils/date";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
-function statusTone(s) {
-  const v = String(s).toLowerCase();
-  if (v === "approved") return "status--present";
-  if (v === "rejected") return "status--absent";
-  return "status--ot";
-}
-
+// OT records are final once recorded — an admin-entered OT is already worked, so
+// there is no approval workflow (no Pending/Approved/Rejected status).
 export default function ViewOt() {
   const { data: ots = [], isLoading } = useOts();
   const { data: employees = [] } = useEmployees();
   const del = useDeleteOt();
-  const update = useUpdateOt();
   const [selEmp, setSelEmp] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [viewOt, setViewOt] = useState(null);
@@ -65,20 +57,6 @@ export default function ViewOt() {
     { key: "fromDate", header: "From", sortable: true, sortValue: (o) => new Date(o.fromDate).getTime(), render: (o) => formatDate(o.fromDate) },
     { key: "location", header: "Location", render: (o) => o.location || "—" },
     {
-      key: "status", header: "Status",
-      render: (o) => (
-        <Select
-          className="select"
-          style={{ width: 130, padding: "4px 8px" }}
-          value={o.status}
-          options={OT_STATUSES}
-          onChange={(e) => update.mutate({ id: o._id, payload: { status: e.target.value } })}
-        >
-          <span />
-        </Select>
-      ),
-    },
-    {
       key: "_actions", header: "Actions", className: "num",
       render: (o) => (
         <div style={{ display: "inline-flex", gap: 2 }}>
@@ -94,7 +72,7 @@ export default function ViewOt() {
     employeeId: o.employeeId, employeeName: o.employeeName, currentShift: o.currentShift,
     additionalShift: o.additionalShift, workingDuration: o.workingDuration,
     from: formatDate(o.fromDate), to: formatDate(o.toDate), location: o.location,
-    reason: o.reason, status: o.status,
+    reason: o.reason,
   }));
 
   return (
@@ -110,7 +88,7 @@ export default function ViewOt() {
                 { key: "employeeId", label: "Employee ID" }, { key: "employeeName", label: "Name" },
                 { key: "currentShift", label: "Current Shift" }, { key: "additionalShift", label: "Additional Shift" },
                 { key: "workingDuration", label: "Duration" }, { key: "from", label: "From" }, { key: "to", label: "To" },
-                { key: "location", label: "Location" }, { key: "reason", label: "Reason" }, { key: "status", label: "Status" },
+                { key: "location", label: "Location" }, { key: "reason", label: "Reason" },
               ],
               rows: exportRows,
               isFiltered: !!selEmp,
@@ -149,7 +127,6 @@ export default function ViewOt() {
                   <Row k="Location" v={viewOt.location || "—"} />
                   <Row k="From Date" v={formatDate(viewOt.fromDate)} />
                   <Row k="To Date" v={formatDate(viewOt.toDate)} />
-                  <Row k="Status" v={viewOt.status || "—"} />
                   <Row k="Created Date" v={formatDateTime(viewOt.createdAt)} />
                 </dl>
               </section>

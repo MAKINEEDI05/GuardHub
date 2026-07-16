@@ -181,13 +181,9 @@ async function buildMonthlyGrid(year, month, employees) {
     }
 
     // Working Days = expected working days (month minus week-offs/holidays).
-    // Net Payable Days = every accounted, non-absent day that counts for pay
-    // (present + leave + OD + week-off + holiday). OT is extra (earns comp-off),
-    // not a base payable day. The Salary module can refine these on top of the
-    // same grid without recomputing attendance.
+    // (Net Payable was removed — it is a payroll-policy figure that belongs to
+    // the Salary module, not this attendance grid, and was reported as incorrect.)
     summary.workingDays = dim - summary.weekOff - summary.holiday;
-    summary.netPayable =
-      summary.present + summary.leave + summary.od + summary.weekOff + summary.holiday;
 
     byEmp.set(e.empId, { days, summary });
   }
