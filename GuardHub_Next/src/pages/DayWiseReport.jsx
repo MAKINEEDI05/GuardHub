@@ -13,6 +13,7 @@ import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useAttendanceByDate } from "../hooks/useReports";
 import { useEmployees } from "../hooks/useEmployees";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
+import { ROSTER_SHIFTS } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date —
@@ -83,6 +84,21 @@ export default function DayWiseReport() {
       });
     });
     return out;
+  }, [rows]);
+
+  // Shift-wise headcount for the day (grouped from each record's rostered shift),
+  // ordered by the canonical shift list with any off-list value appended.
+  const shiftCounts = useMemo(() => {
+    const map = new Map();
+    rows.forEach((r) => {
+      const s = String(r.empShift || "").trim() || "Not Set";
+      map.set(s, (map.get(s) || 0) + 1);
+    });
+    const order = [...ROSTER_SHIFTS, "Not Set"];
+    return [...map.entries()].sort((a, b) => {
+      const ia = order.indexOf(a[0]); const ib = order.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
+    });
   }, [rows]);
 
   const columns = [
@@ -160,6 +176,21 @@ export default function DayWiseReport() {
           </div>
         ))}
       </div>
+
+      {/* Shift-wise headcount for the selected day */}
+      {shiftCounts.length > 0 && (
+        <>
+          <div className="text-sm muted" style={{ fontWeight: 600, margin: "0 0 8px" }}>Shift Wise</div>
+          <div className="summary-grid mb-4">
+            {shiftCounts.map(([shift, n]) => (
+              <div className="summary-tile" key={shift}>
+                <div className="summary-tile__value">{n}</div>
+                <div className="summary-tile__label">{shift}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {futureDate ? (
         <Card>

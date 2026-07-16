@@ -17,6 +17,7 @@ import {
   isFutureYmd,
   FUTURE_DATE_MESSAGE,
 } from "../utils/date";
+import { ROSTER_SHIFTS } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Month Wise Report — all employees by default, search just filters the table.
@@ -81,6 +82,22 @@ export default function MonthWiseReport() {
         .some((v) => v.includes(q))
     );
   }, [rows, term]);
+
+  // Shift-wise totals = days rostered to each shift, summed over the FILTERED
+  // rows (rosters rotate by weekday, so one employee contributes to several).
+  const shiftCounts = useMemo(() => {
+    const map = new Map();
+    filtered.forEach((r) => {
+      Object.entries(r.shiftDays || {}).forEach(([shift, n]) => {
+        map.set(shift, (map.get(shift) || 0) + n);
+      });
+    });
+    const order = ROSTER_SHIFTS;
+    return [...map.entries()].sort((a, b) => {
+      const ia = order.indexOf(a[0]); const ib = order.indexOf(b[0]);
+      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
+    });
+  }, [filtered]);
 
   const exportCsv = () => {
     if (!filtered.length) return;
@@ -178,6 +195,23 @@ export default function MonthWiseReport() {
         </div>
         {dateError && <div className="field__error mt-2">{dateError}</div>}
       </Card>
+
+      {/* Shift-wise cards — days rostered to each shift over the selected range */}
+      {!dateError && shiftCounts.length > 0 && (
+        <>
+          <div className="text-sm muted" style={{ fontWeight: 600, margin: "0 0 8px" }}>
+            Shift Wise (days in range)
+          </div>
+          <div className="summary-grid mb-4">
+            {shiftCounts.map(([shift, n]) => (
+              <div className="summary-tile" key={shift}>
+                <div className="summary-tile__value">{n}</div>
+                <div className="summary-tile__label">{shift}</div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
 
       {dateError ? (
         <Card>

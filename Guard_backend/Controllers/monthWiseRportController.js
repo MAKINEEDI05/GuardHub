@@ -375,6 +375,23 @@ const getMonthwiseSummary = async (req, res) => {
       }
       return set;
     };
+    // Days in the range this employee is rostered to each shift, e.g.
+    // { "General": 12, "A Shift": 4, "WEEK OFF": 4 }. Rosters rotate by weekday,
+    // so an employee legitimately contributes days to several shifts. Summed by
+    // the UI over the filtered rows to drive the shift-wise cards.
+    const shiftDaysFor = (code) => {
+      const roster = rosterMap.get(code);
+      const out = {};
+      if (roster && roster.weeklyShifts) {
+        WEEKDAYS.forEach((d, i) => {
+          const s = String(roster.weeklyShifts[d] || "").trim();
+          if (!s) return;
+          out[s] = (out[s] || 0) + dowCounts[i];
+        });
+      }
+      return out;
+    };
+
     // Count covered dates whose weekday is NOT one of the employee's weekly offs.
     const countWorkingCovered = (set, offSet) => {
       if (!set) return 0;
@@ -411,6 +428,7 @@ const getMonthwiseSummary = async (req, res) => {
         otDays,
         weekOffDays,
         totalDays,
+        shiftDays: shiftDaysFor(code),
       };
     });
 
