@@ -40,9 +40,6 @@ export const OT_DURATIONS = [
   "Double Shift",
 ];
 
-// OT statuses — MUST match otScheme enum exactly.
-export const OT_STATUSES = ["Pending", "Approved", "Rejected"];
-
 // Roster shift values. The backend bulk-upload normalises many synonyms, but
 // these are the canonical values stored and shown in the grid.
 export const ROSTER_SHIFTS = [

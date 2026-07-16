@@ -7,6 +7,7 @@ const {
   computeApplicableDays,
   weeklyOffIndexesFromRoster,
 } = require("../utils/workingDays");
+const { findConflict } = require("../utils/dateOverlap");
 const {
   computeDeduction,
   validateCustomLeaveName,
@@ -30,6 +31,23 @@ async function weeklyOffForEmp(empId) {
 // Message shown when a range collapses to zero applicable days (all weekly off).
 const ALL_WEEKOFF_MSG =
   "The selected dates fall entirely on the employee's weekly off day(s) — there are no leave days to apply.";
+
+// Reject a leave whose dates overlap an existing leave for the same employee
+// (prevents double-deduction). Complementary half-days on one day are allowed.
+// `excludeId` skips the record being edited. Returns an error string, or null.
+async function leaveOverlapError(empId, from, to, dayType, excludeId) {
+  const q = { empId, fromDate: { $lte: to }, toDate: { $gte: from } };
+  if (excludeId) q._id = { $ne: excludeId };
+  const existing = await LeaveTransaction.find(q)
+    .select("fromDate toDate dayType leaveTypeName customLeaveName")
+    .lean();
+  const clash = findConflict(from, to, dayType, existing.map((e) => ({
+    from: e.fromDate, to: e.toDate, dayType: e.dayType, ref: e,
+  })));
+  if (!clash) return null;
+  const name = clash.ref.customLeaveName || clash.ref.leaveTypeName || "leave";
+  return `This overlaps an existing ${name} (${String(clash.ref.fromDate).slice(0, 10)} to ${String(clash.ref.toDate).slice(0, 10)}) for this employee.`;
+}
 
 // Debit CL then Comp Off for one leave's split (seeding CL's allocation from its
 // default quota on first touch so a fresh balance row still reflects the real
@@ -77,6 +95,10 @@ const recordLeave = async (req, res) => {
     }
     const month = from.getUTCMonth() + 1;
     const year = from.getUTCFullYear();
+
+    // No overlapping leave for the same employee (double-deduction guard).
+    const overlap = await leaveOverlapError(empIdNum, from, to, dayType, null);
+    if (overlap) return res.status(409).json({ message: overlap });
 
     const isOthers = String(leaveTypeCode).toUpperCase() === OTHERS_CODE;
 
@@ -227,6 +249,10 @@ const updateLeave = async (req, res) => {
     }
     const month = from.getUTCMonth() + 1;
     const year = from.getUTCFullYear();
+
+    // No overlapping leave for the same employee (excluding this record itself).
+    const overlap = await leaveOverlapError(txn.empId, from, to, dayType, txn._id);
+    if (overlap) return res.status(409).json({ message: overlap });
 
     const isOthers = nextCode === OTHERS_CODE;
 

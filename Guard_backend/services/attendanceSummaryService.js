@@ -158,9 +158,12 @@ async function buildMonthlyGrid(year, month, employees) {
       const ot = otDays.has(d);
       const wo = weekOffIdx.has(weekday);
 
+      // A weekly-off day is NOT consumed by a leave/OD (those day counts exclude
+      // weekly offs — see utils/workingDays), so on a week-off day leave/OD are
+      // suppressed and the day reads WO. Present/OT still show (actual work).
       if (present) statuses.push("P");
-      if (leaveCode) statuses.push(leaveCode);
-      if (od) statuses.push("OD");
+      if (leaveCode && !wo) statuses.push(leaveCode);
+      if (od && !wo) statuses.push("OD");
       if (ot) statuses.push("OT");
 
       if (statuses.length === 0) {
@@ -173,8 +176,8 @@ async function buildMonthlyGrid(year, month, employees) {
 
       // Tally (a combined day counts toward each of its components)
       if (present) summary.present += 1;
-      if (leaveCode) summary.leave += 1;
-      if (od) summary.od += 1;
+      if (leaveCode && !wo) summary.leave += 1;
+      if (od && !wo) summary.od += 1;
       if (ot) summary.ot += 1;
       if (statuses.length === 1 && statuses[0] === "WO") summary.weekOff += 1;
       if (statuses.length === 1 && statuses[0] === "A") summary.absent += 1;

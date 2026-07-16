@@ -362,11 +362,36 @@ const getMonthwiseSummary = async (req, res) => {
     };
 
     // ---- Assemble per-employee rows ------------------------------------------
+    // Weekly-off weekday set for an employee (to exclude those days from the
+    // leave/OD counts — a leave/OD never consumes a weekly off, matching the
+    // stored day count and the muster grid).
+    const weekOffWeekdaysFor = (code) => {
+      const roster = rosterMap.get(code);
+      const set = new Set();
+      if (roster && roster.weeklyShifts) {
+        WEEKDAYS.forEach((d, i) => {
+          if (isWeekOffValue(roster.weeklyShifts[d])) set.add(i);
+        });
+      }
+      return set;
+    };
+    // Count covered dates whose weekday is NOT one of the employee's weekly offs.
+    const countWorkingCovered = (set, offSet) => {
+      if (!set) return 0;
+      let n = 0;
+      for (const key of set) {
+        const dow = new Date(`${key}T00:00:00.000Z`).getUTCDay();
+        if (!offSet.has(dow)) n += 1;
+      }
+      return n;
+    };
+
     let rows = employees.map((e) => {
       const code = String(e.empId);
+      const offSet = weekOffWeekdaysFor(code);
       const presentDays = presentMap.get(code) || 0;
-      const leaveDays = leaveMap.get(e.empId)?.size || 0;
-      const odDays = odMap.get(e.empId)?.size || 0;
+      const leaveDays = countWorkingCovered(leaveMap.get(e.empId), offSet);
+      const odDays = countWorkingCovered(odMap.get(e.empId), offSet);
       const otDays = otMap.get(e.empId)?.size || 0;
       const weekOffDays = weekOffFor(code);
       const absentDays = Math.max(
