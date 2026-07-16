@@ -11,11 +11,24 @@ const { ACTIVE_FILTER, getActiveEmployeeIds } = require("../utils/employeeRef");
 // Safe read of a single type bucket from a balance doc's `types` object.
 const bucket = (types, code) => (types && types[code]) || { allocated: 0, used: 0 };
 
-// Comp Off: leave earned from completed (APPROVED) overtime. Its "allocated" is
-// NOT a fixed quota — it is derived from OT — so it is computed on the balance
-// read path (never stored), and `used` is the ordinary per-type debit that
-// recordLeave writes when a "Comp Off" leave is applied. remaining = earned - used.
+// Comp Off: leave earned from OT. Its "allocated" is NOT a fixed quota — it is
+// derived from OT — so it is computed on the balance read path (never stored),
+// and `used` is the Comp Off portion of the CL→Comp Off deduction that
+// recordLeave writes. remaining = earned - used.
+//
+// Policy (req 3): there is NO OT approval workflow — recording an OT entry means
+// the overtime was already worked, so EVERY OT entry immediately earns Comp Off.
+const CL_CODE = "CL";
 const COMP_CODE = "COMP";
+
+// The only two balance-bearing (deductible) buckets. Every leave is funded from
+// CL then Comp Off (req 4); the predefined leave TYPES (Special/Summer/Holiday…)
+// remain selectable category labels on a leave record but do not carry their own
+// balance. This keeps one clean, consistent balance everywhere (req 7).
+const DEDUCTIBLE_TYPES = [
+  { code: CL_CODE, name: "Casual Leave" },
+  { code: COMP_CODE, name: "Comp Off" },
+];
 
 // OT working-duration -> days (the OT schema stores a coarse enum, not a number).
 const OT_DURATION_DAYS_STAGE = {
@@ -29,11 +42,11 @@ const OT_DURATION_DAYS_STAGE = {
   },
 };
 
-// empId -> Comp Off days EARNED in `year` (sum of approved OT days). One
-// aggregation, reused by every balance read so Comp Off stays identical across
-// Apply Leave, Leave Management, reports, etc. (no duplicated calculation).
+// empId -> Comp Off days EARNED in `year` (sum of ALL OT days — no approval
+// gate, req 3). One aggregation, reused by every balance read so Comp Off stays
+// identical across Apply Leave, Leave Management, reports, etc. (single source).
 async function compOffEarnedMap(year, empIds) {
-  const match = { status: "Approved" };
+  const match = {};
   if (Array.isArray(empIds) && empIds.length) match.employeeId = { $in: empIds };
   const agg = await Ot.aggregate([
     { $match: match },
@@ -93,35 +106,50 @@ async function getBalanceMap(year, empIds) {
   return map;
 }
 
-// Build per-employee balance rows for a year (byType + totals). Output shape is
-// unchanged from the pre-refactor version so existing consumers keep working.
+// Build per-employee balance rows for a year (byType + totals). The balance is
+// the two deductible buckets only — CL and Comp Off (req 4/7); other predefined
+// types are category labels on leave records, not balances. Output shape (byType
+// + totals) is unchanged so existing consumers keep working.
 async function buildYearRows(year, empIdFilter) {
-  const [employees, types] = await Promise.all([
+  const [employees, dbTypes] = await Promise.all([
     employe.find(ACTIVE_FILTER).lean(),
-    LeaveType.find({ active: true }).sort({ sortOrder: 1, name: 1 }).lean(),
+    LeaveType.find({ active: true, code: { $in: [CL_CODE, COMP_CODE] } }).lean(),
   ]);
+
+  // Always expose CL + Comp Off (fall back to canonical names/quota if a type
+  // row is missing) so the balance view is stable even on a fresh install.
+  const byCode = new Map(dbTypes.map((t) => [t.code, t]));
+  const types = DEDUCTIBLE_TYPES.map((d) => byCode.get(d.code) || d);
+  // CL's default quota seeds a brand-new employee's allocation until a formal
+  // allocation (or first debit) stores it — so their real CL entitlement is
+  // available to the deduction even before any allocation run.
+  const clQuota = byCode.get(CL_CODE)?.defaultAnnualQuota || 0;
 
   const list =
     empIdFilter != null ? employees.filter((e) => e.empId === empIdFilter) : employees;
 
   const ids = empIdFilter != null ? [empIdFilter] : list.map((e) => e.empId);
-  const hasComp = types.some((t) => t.code === COMP_CODE);
   const [balMap, compMap] = await Promise.all([
     getBalanceMap(year, ids),
-    hasComp ? compOffEarnedMap(year, ids) : Promise.resolve(new Map()),
+    compOffEarnedMap(year, ids),
   ]);
 
   return list
     .map((e) => {
       const typesObj = balMap.get(e.empId) || {};
-      // Include EVERY active leave type (even with 0 allocation) so the UI shows
-      // "0" rather than "—"/blank for a type the employee hasn't been allocated
-      // yet. Consumers that only care about real allocations (e.g. the dashboard
-      // low-balance widget) filter on allocated > 0 themselves.
       const byType = types.map((t) => {
         const b = bucket(typesObj, t.code);
-        // Comp Off "allocated" is EARNED from approved OT (derived, not stored).
-        const allocated = t.code === COMP_CODE ? compMap.get(e.empId) || 0 : b.allocated || 0;
+        const hasBucket =
+          typesObj && Object.prototype.hasOwnProperty.call(typesObj, t.code);
+        // Comp Off "allocated" is EARNED from OT (derived, not stored). CL
+        // "allocated" is the stored allocation, falling back to the default
+        // quota until one is written.
+        const allocated =
+          t.code === COMP_CODE
+            ? compMap.get(e.empId) || 0
+            : hasBucket
+            ? b.allocated || 0
+            : clQuota;
         const used = b.used || 0;
         return {
           leaveTypeCode: t.code,
@@ -163,6 +191,16 @@ async function getRemainingForType(empId, year, leaveTypeCode) {
   if (!row) return 0;
   const t = row.byType.find((b) => b.leaveTypeCode === code);
   return t ? t.remaining : 0;
+}
+
+// CL + Comp Off remaining for ONE employee/year in a single balance read. This
+// is the exact input the CL→Comp Off deduction runs against, so the split shown
+// (and stored) matches every other balance view. Returns { cl, comp }.
+async function getClCompRemaining(empId, year) {
+  const rows = await buildYearRows(year, empId);
+  const row = rows[0];
+  const pick = (code) => row?.byType.find((b) => b.leaveTypeCode === code)?.remaining || 0;
+  return { cl: pick(CL_CODE), comp: pick(COMP_CODE) };
 }
 
 // GET /leave/balances?year=2026&empId=1234  (output shape unchanged)
@@ -248,8 +286,10 @@ module.exports = {
   buildYearRows,
   getBalanceMap,
   getRemainingForType,
+  getClCompRemaining,
   bucket,
   syncLeaveTypeQuota,
   compOffEarnedMap,
+  CL_CODE,
   COMP_CODE,
 };

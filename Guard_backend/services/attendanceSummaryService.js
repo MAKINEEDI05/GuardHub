@@ -7,7 +7,7 @@
 //   Leave    -> leave_transactions (carries the leave-type code; kept in lock-
 //               step with the legacy leave_mgmts the Month-Wise report reads)
 //   OD       -> od_mgmt
-//   OT       -> APPROVED ot_mgmt
+//   OT       -> ot_mgmt (every entry — no approval workflow)
 //   Week Off -> roster_mgmt weekly week-off weekdays
 //
 // The Attendance Muster Roll report and the (future) Salary module both consume
@@ -86,9 +86,9 @@ async function buildMonthlyGrid(year, month, employees) {
       empFromDate: { $lte: endBoundary },
       empToDate: { $gte: startBoundary },
     }).lean(),
+    // Every OT entry counts — there is no approval workflow (req 3).
     ot_mgmt.find({
       employeeId: { $in: idList },
-      status: "Approved",
       fromDate: { $lte: endBoundary },
       toDate: { $gte: startBoundary },
     }).lean(),
@@ -102,8 +102,12 @@ async function buildMonthlyGrid(year, month, employees) {
   for (const l of leaves) {
     if (!leaveByEmp.has(l.empId)) leaveByEmp.set(l.empId, new Map());
     const m = leaveByEmp.get(l.empId);
+    // "Others" leaves show a short "OTH" token in the day grid (the full custom
+    // name is impractical in a single cell; it appears in every other view).
+    const code = String(l.leaveTypeCode || "L").toUpperCase();
+    const cell = code === "OTHERS" ? "OTH" : code;
     for (const d of coveredDayNums(l.fromDate, l.toDate, year, month, dim)) {
-      m.set(d, String(l.leaveTypeCode || "L").toUpperCase());
+      m.set(d, cell);
     }
   }
 

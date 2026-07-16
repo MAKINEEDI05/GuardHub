@@ -8,6 +8,7 @@ import LeaveEditDrawer from "./LeaveEditDrawer";
 import { useLeaveTransactions, useDeleteLeaveTxn } from "../../hooks/useLeaveV2";
 import { formatDate, formatDateTime } from "../../utils/date";
 import { buildLeaveDetail } from "../../utils/leaveDetail";
+import { leaveTypeLabel } from "../../utils/leaveDeduction";
 
 // Unified Employee Leave details drawer. EVERYTHING here respects the currently
 // applied filters: the summary + balance-by-type come from the (already filtered)
@@ -85,16 +86,20 @@ export default function LeaveDetailsDrawer({ emp, filters = {}, onClose }) {
                   <thead>
                     <tr>
                       <th>Type</th><th>From</th><th>To</th><th className="num">Days</th>
+                      <th className="num">CL</th><th className="num">Comp Off</th><th className="num">Neg.</th>
                       <th>Duration</th><th>Reason</th><th>Created</th><th></th>
                     </tr>
                   </thead>
                   <tbody>
                     {rows.map((l) => (
                       <tr key={l._id}>
-                        <td><Badge status="leave">{l.leaveTypeName}</Badge></td>
+                        <td><Badge status="leave">{leaveTypeLabel(l)}</Badge></td>
                         <td className="nowrap">{formatDate(l.fromDate)}</td>
                         <td className="nowrap">{formatDate(l.toDate)}</td>
                         <td className="num"><strong>{l.days}</strong></td>
+                        <td className="num">{l.clUsed ?? 0}</td>
+                        <td className="num">{l.compUsed ?? 0}</td>
+                        <td className="num">{l.lopDays > 0 ? -l.lopDays : 0}</td>
                         <td>{l.dayType || "—"}</td>
                         <td><span title={l.reason}>{(l.reason || "—").slice(0, 24)}</span></td>
                         <td className="nowrap text-sm muted">{formatDateTime(l.createdAt)}</td>
@@ -122,7 +127,7 @@ export default function LeaveDetailsDrawer({ emp, filters = {}, onClose }) {
       <ConfirmDialog
         open={!!delTxn}
         title="Delete leave record?"
-        message={delTxn ? `Delete this ${delTxn.leaveTypeName} (${delTxn.days} day(s))? This restores the balance.` : ""}
+        message={delTxn ? `Delete this ${leaveTypeLabel(delTxn)} (${delTxn.days} day(s))? This restores the balance.` : ""}
         confirmLabel="Delete"
         loading={del.isPending}
         onCancel={() => setDelTxn(null)}

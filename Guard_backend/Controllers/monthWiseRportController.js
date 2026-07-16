@@ -204,7 +204,7 @@ const getMonthwiseReport = async (req, res) => {
  *   Present Days = unique calendar dates with >=1 biometric log (secattendancelogs)
  *   Leave Days   = days in range covered by leave_mgmts records
  *   OD Days      = days in range covered by od_mgmt records
- *   OT Days      = days in range covered by APPROVED ot_mgmt records
+ *   OT Days      = days in range covered by ot_mgmt records (all entries)
  *   Week Off     = days in range whose weekday is a roster week-off
  *   Absent Days  = totalDaysInRange - present - leave - od - weekOff  (>= 0)
  *
@@ -341,9 +341,8 @@ const getMonthwiseSummary = async (req, res) => {
     const [leaveMap, odMap, otMap] = await Promise.all([
       buildCovered(leave_mgmt, "empId", "empFromDate", "empToDate"),
       buildCovered(od_mgmt, "empId", "empFromDate", "empToDate"),
-      buildCovered(ot_mgmt, "employeeId", "fromDate", "toDate", {
-        status: "Approved",
-      }),
+      // Every OT entry counts — there is no approval workflow (req 3).
+      buildCovered(ot_mgmt, "employeeId", "fromDate", "toDate"),
     ]);
 
     // ---- Week off: per-employee from roster, counted via weekday occurrences -
