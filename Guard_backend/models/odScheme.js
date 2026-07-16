@@ -16,13 +16,28 @@ const od_scheme = new mongoose.Schema(
       type: Date,
       required: true,
     },
+    // Current shift the employee is rostered for on the OD date (an OD moves them
+    // off it). Free string — a roster value can be General / A Shift / WEEK OFF /
+    // Summer Vacation, so it is NOT constrained to an enum.
     empShiftType: {
       type: String,
       required: true,
     },
+    // Shift the employee is deputed to at the OD location, and how long the OD
+    // runs. Mirrors the OT form. Kept as free strings (the UI constrains them).
+    additionalShift: {
+      type: String,
+      default: "",
+    },
+    workingDuration: {
+      type: String,
+      default: "",
+    },
+    // Legacy half-day/full-day marker (FULL DAY / FIRST HALF / SECOND HALF).
+    // Superseded by workingDuration; kept optional so old records still read.
     empOdType: {
       type: String,
-      required: true,
+      default: "",
     },
     empPurpose: {
       type: String,

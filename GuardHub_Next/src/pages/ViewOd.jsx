@@ -15,12 +15,12 @@ import { useEmployees } from "../hooks/useEmployees";
 import { formatDate, formatDateTime } from "../utils/date";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
-// Inclusive day count for an OD span; a single-day half counts as 0.5.
-function odDays(from, to, type) {
+// Inclusive day count for an OD span; a single-day half-day duration counts as 0.5.
+function odDays(from, to, duration) {
   if (!from || !to) return null;
   const d = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
   if (d < 1) return null;
-  if (d === 1 && /HALF/i.test(type || "")) return 0.5;
+  if (d === 1 && /half/i.test(duration || "")) return 0.5;
   return d;
 }
 
@@ -58,8 +58,9 @@ export default function ViewOd() {
     { key: "odLocation", header: "Location", render: (o) => <Badge status="od">{o.odLocation || "Not Specified"}</Badge> },
     { key: "empFromDate", header: "From", sortable: true, sortValue: (o) => new Date(o.empFromDate).getTime(), render: (o) => formatDate(o.empFromDate) },
     { key: "empToDate", header: "To", render: (o) => formatDate(o.empToDate) },
-    { key: "empOdType", header: "Duration", render: (o) => o.empOdType || "—" },
-    { key: "empShiftType", header: "Shift", render: (o) => o.empShiftType || "—" },
+    { key: "empShiftType", header: "Current Shift", render: (o) => o.empShiftType || "—" },
+    { key: "additionalShift", header: "Additional Shift", render: (o) => o.additionalShift || "—" },
+    { key: "workingDuration", header: "Working Duration", render: (o) => o.workingDuration || o.empOdType || "—" },
     { key: "empPurpose", header: "Purpose", render: (o) => <span title={o.empPurpose}>{(o.empPurpose || "—").slice(0, 30)}</span> },
     {
       key: "_actions", header: "Actions", className: "num",
@@ -76,7 +77,8 @@ export default function ViewOd() {
   const exportRows = rows.map((o) => ({
     empId: o.empId, name: o._name, location: o.odLocation,
     from: formatDate(o.empFromDate), to: formatDate(o.empToDate),
-    duration: o.empOdType, shift: o.empShiftType, purpose: o.empPurpose,
+    currentShift: o.empShiftType, additionalShift: o.additionalShift,
+    workingDuration: o.workingDuration || o.empOdType, purpose: o.empPurpose,
   }));
 
   return (
@@ -90,8 +92,9 @@ export default function ViewOd() {
               baseName: "od-records",
               columns: [
                 { key: "empId", label: "Employee ID" }, { key: "name", label: "Name" }, { key: "location", label: "Location" },
-                { key: "from", label: "From" }, { key: "to", label: "To" }, { key: "duration", label: "Duration" },
-                { key: "shift", label: "Shift" }, { key: "purpose", label: "Purpose" },
+                { key: "from", label: "From" }, { key: "to", label: "To" },
+                { key: "currentShift", label: "Current Shift" }, { key: "additionalShift", label: "Additional Shift" },
+                { key: "workingDuration", label: "Working Duration" }, { key: "purpose", label: "Purpose" },
               ],
               rows: exportRows,
               isFiltered: !!selEmp,
@@ -112,7 +115,7 @@ export default function ViewOd() {
       <Drawer open={!!viewOd} title="OD Details" onClose={() => setViewOd(null)} width={520}>
         {viewOd && (() => {
           const e = empMap.get(String(viewOd.empId)) || {};
-          const days = odDays(viewOd.empFromDate, viewOd.empToDate, viewOd.empOdType);
+          const days = odDays(viewOd.empFromDate, viewOd.empToDate, viewOd.workingDuration || viewOd.empOdType);
           return (
             <div className="stack" style={{ gap: 16 }}>
               <section>
@@ -124,10 +127,11 @@ export default function ViewOd() {
                 <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 6 }}>OD Information</div>
                 <dl className="detail-grid">
                   <Row k="Location" v={viewOd.odLocation || "Not Specified"} />
-                  <Row k="Shift" v={viewOd.empShiftType || "—"} />
+                  <Row k="Current Shift" v={viewOd.empShiftType || "—"} />
+                  <Row k="Additional Shift" v={viewOd.additionalShift || "—"} />
+                  <Row k="Working Duration" v={viewOd.workingDuration || viewOd.empOdType || "—"} />
                   <Row k="From Date" v={formatDate(viewOd.empFromDate)} />
                   <Row k="To Date" v={formatDate(viewOd.empToDate)} />
-                  <Row k="Duration" v={viewOd.empOdType || "—"} />
                   <Row k="Number of Days" v={days ?? "—"} />
                   <Row k="Created Date" v={formatDateTime(viewOd.createdAt)} />
                 </dl>

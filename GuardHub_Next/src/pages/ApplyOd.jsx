@@ -9,15 +9,18 @@ import DateField from "../components/forms/DateField";
 import { Field, Input, Select, Textarea } from "../components/ui/Field";
 import { useApplyOd } from "../hooks/useOds";
 import { useRosterByEmp } from "../hooks/useRoster";
-import { SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
+import { SHIFT_TYPES, OT_SHIFTS, OT_DURATIONS } from "../utils/constants";
 import { todayYmd } from "../utils/date";
 import { shiftForDate } from "../utils/roster";
 
-// Apply OD: Search Employee → verify → location + OD details → reason → submit.
-// Payload matches the backend OD schema (empId Number; odLocation required —
-// defaults server-side to "Not Specified"). The current shift is auto-filled
-// from the employee's roster for the OD date (an OD moves them off that shift).
-const INIT = { empShiftType: "", empOdType: "", empFromDate: "", empToDate: "", odLocation: "", empPurpose: "" };
+// Apply OD: Search Employee → verify → shift/duration/location/dates → purpose →
+// submit. Mirrors the OT form: the current shift is auto-filled from the
+// employee's roster for the OD date (an OD moves them off that shift), plus the
+// additional shift they are deputed to, working duration and location.
+const INIT = {
+  empShiftType: "", additionalShift: "", workingDuration: "",
+  empFromDate: "", empToDate: "", odLocation: "", empPurpose: "",
+};
 
 export default function ApplyOd() {
   const navigate = useNavigate();
@@ -45,11 +48,12 @@ export default function ApplyOd() {
     const errs = {};
     if (!emp) errs.emp = "Select an employee.";
     if (!form.empShiftType) errs.empShiftType = "Required";
-    if (!form.empOdType) errs.empOdType = "Required";
+    if (!form.additionalShift) errs.additionalShift = "Required";
+    if (!form.workingDuration) errs.workingDuration = "Required";
     if (!form.empFromDate) errs.empFromDate = "Required";
     if (!form.empToDate) errs.empToDate = "Required";
     else if (form.empToDate < form.empFromDate) errs.empToDate = "To date must be after from date.";
-    if (!form.odLocation.trim()) errs.odLocation = "Enter the OD location.";
+    if (!form.odLocation.trim()) errs.odLocation = "Enter the location.";
     if (!form.empPurpose.trim() || form.empPurpose.trim().length < 5) errs.empPurpose = "Enter a purpose (min 5 chars).";
     setErrors(errs);
     return Object.keys(errs).length === 0;
@@ -62,7 +66,8 @@ export default function ApplyOd() {
       await apply.mutateAsync({
         empId: parseInt(emp.empId, 10),
         empShiftType: form.empShiftType,
-        empOdType: form.empOdType,
+        additionalShift: form.additionalShift,
+        workingDuration: form.workingDuration,
         empFromDate: form.empFromDate,
         empToDate: form.empToDate,
         odLocation: form.odLocation.trim(),
@@ -96,9 +101,6 @@ export default function ApplyOd() {
         }
       >
         <FormSection title="OD Details">
-          <Field label="OD Location" required error={errors.odLocation}>
-            <Input value={form.odLocation} onChange={set("odLocation")} maxLength={120} placeholder="e.g. Main Gate, Admin Building" />
-          </Field>
           <div className="field-grid-2">
             <Field
               label="Current Shift"
@@ -117,8 +119,14 @@ export default function ApplyOd() {
                 />
               )}
             </Field>
-            <Field label="Duration" required error={errors.empOdType}>
-              <Select value={form.empOdType} onChange={set("empOdType")} options={DAY_TYPES} placeholder="Select duration" />
+            <Field label="Additional Shift" required error={errors.additionalShift}>
+              <Select value={form.additionalShift} onChange={set("additionalShift")} options={OT_SHIFTS} placeholder="Select shift" />
+            </Field>
+            <Field label="Working Duration" required error={errors.workingDuration}>
+              <Select value={form.workingDuration} onChange={set("workingDuration")} options={OT_DURATIONS} placeholder="Select duration" />
+            </Field>
+            <Field label="Location" required error={errors.odLocation}>
+              <Input value={form.odLocation} onChange={set("odLocation")} maxLength={120} placeholder="e.g. Main Gate" />
             </Field>
             <DateField label="From Date" required value={form.empFromDate} onChange={set("empFromDate")} error={errors.empFromDate} />
             <DateField label="To Date" required value={form.empToDate} min={form.empFromDate} onChange={set("empToDate")} error={errors.empToDate} />
