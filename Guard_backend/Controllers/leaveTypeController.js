@@ -97,17 +97,25 @@ const updateType = async (req, res) => {
   }
 };
 
+// Mandatory buckets that can never be removed: Comp Off (holds the OT-earned
+// comp-off balance) and Casual Leave (the primary bucket every leave deducts).
+const MANDATORY_CODES = ["CL", "COMP"];
+
 // DELETE /leave/types/:id — soft delete (deactivate) so historical
-// transactions/balances that reference the code stay intact.
+// transactions/balances that reference the code stay intact; the Leave Types
+// list then hides it. The mandatory buckets (CL, Comp Off) cannot be removed.
 const deleteType = async (req, res) => {
   try {
-    const doc = await LeaveType.findByIdAndUpdate(
-      req.params.id,
-      { active: false },
-      { new: true }
-    );
-    if (!doc) return res.status(404).json({ message: "Leave type not found" });
-    return res.status(200).json({ message: "Leave type deactivated", data: doc });
+    const target = await LeaveType.findById(req.params.id);
+    if (!target) return res.status(404).json({ message: "Leave type not found" });
+    if (MANDATORY_CODES.includes(target.code)) {
+      return res.status(400).json({
+        message: `"${target.name}" is a mandatory leave type and cannot be removed.`,
+      });
+    }
+    target.active = false;
+    await target.save();
+    return res.status(200).json({ message: "Leave type removed", data: target });
   } catch (error) {
     console.error("Error deleting leave type:", error);
     return res.status(500).json({ message: "Failed to delete leave type" });

@@ -57,9 +57,9 @@ export function useDeleteLeaveType() {
     mutationFn: (id) => leaveTypeService.remove(id),
     onSuccess: () => {
       invalidateLeave(qc);
-      toast.success("Leave type deactivated.");
+      toast.success("Leave type removed.");
     },
-    onError: (e) => toast.error(e.friendlyMessage || "Failed to deactivate."),
+    onError: (e) => toast.error(e.friendlyMessage || "Failed to remove leave type."),
   });
 }
 

@@ -20,6 +20,7 @@ export const queryClient = new QueryClient({
 export const QK = {
   employees: ["employees"],
   rosters: ["rosters"],
+  rosterByEmp: (empId) => ["roster-by-emp", empId],
   leavesRange: (from, to) => ["leaves", from, to],
   // Leave Management v2
   leaveTypes: ["leave-types"],
