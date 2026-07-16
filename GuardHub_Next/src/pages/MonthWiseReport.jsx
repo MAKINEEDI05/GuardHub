@@ -37,17 +37,6 @@ const CSV_COLUMNS = [
   { key: "totalDays", label: "Total Days" },
 ];
 
-// Summary cards above the table — aggregated over the currently filtered rows.
-const SUMMARY = [
-  { key: "totalEmployees", label: "Total Employees" },
-  { key: "presentDays", label: "Present Days" },
-  { key: "absentDays", label: "Absent Days" },
-  { key: "leaveDays", label: "Leave Days" },
-  { key: "odDays", label: "OD Days" },
-  { key: "otDays", label: "OT Days" },
-  { key: "weekOffDays", label: "Week Off Days" },
-];
-
 // Numeric attendance columns rendered as right-aligned, sortable cells.
 const COUNT_COLS = [
   { key: "presentDays", header: "Present" },
@@ -92,16 +81,6 @@ export default function MonthWiseReport() {
         .some((v) => v.includes(q))
     );
   }, [rows, term]);
-
-  const counts = useMemo(() => {
-    const out = { totalEmployees: filtered.length };
-    SUMMARY.forEach((s) => {
-      if (s.key !== "totalEmployees") {
-        out[s.key] = filtered.reduce((sum, r) => sum + (r[s.key] || 0), 0);
-      }
-    });
-    return out;
-  }, [filtered]);
 
   const exportCsv = () => {
     if (!filtered.length) return;
@@ -199,16 +178,6 @@ export default function MonthWiseReport() {
         </div>
         {dateError && <div className="field__error mt-2">{dateError}</div>}
       </Card>
-
-      {/* Summary cards */}
-      <div className="summary-grid mb-4">
-        {SUMMARY.map((s) => (
-          <div className="summary-tile" key={s.key}>
-            <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
-            <div className="summary-tile__label">{s.label}</div>
-          </div>
-        ))}
-      </div>
 
       {dateError ? (
         <Card>

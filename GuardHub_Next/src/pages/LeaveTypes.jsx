@@ -11,6 +11,11 @@ import { useLeaveTypes, useSaveLeaveType, useDeleteLeaveType } from "../hooks/us
 
 const INIT = { code: "", name: "", defaultAnnualQuota: 0, isPaid: "true", sortOrder: 0, description: "" };
 
+// Mandatory buckets that always stay in the list and can't be removed: Comp Off
+// (holds the OT-earned comp-off balance) and Casual Leave (the primary bucket
+// every leave deducts from).
+const MANDATORY_CODES = ["CL", "COMP"];
+
 // Leave Types master — the configurable categories that everything else keys
 // off. Adding a type here is all that's needed to make it available in Apply
 // Leave and Allocation; no code change (the requirement).
@@ -18,6 +23,10 @@ export default function LeaveTypes() {
   const { data: types = [], isLoading } = useLeaveTypes(false);
   const save = useSaveLeaveType();
   const del = useDeleteLeaveType();
+
+  // Removed (inactive) types drop out of the list; the mandatory buckets always
+  // stay visible even if inactive.
+  const rows = types.filter((t) => t.active || MANDATORY_CODES.includes(t.code));
 
   const [editing, setEditing] = useState(null); // null | {} (new) | type (edit)
   const [form, setForm] = useState(INIT);
@@ -75,8 +84,8 @@ export default function LeaveTypes() {
           <button className="btn btn--ghost btn--icon" title="Edit" aria-label="Edit leave type" onClick={() => openEdit(t)}>
             <Icon name="edit" size={16} />
           </button>
-          {t.active && (
-            <button className="btn btn--ghost btn--icon" title="Deactivate" aria-label="Deactivate leave type" onClick={() => setConfirm(t)}>
+          {t.active && !MANDATORY_CODES.includes(t.code) && (
+            <button className="btn btn--ghost btn--icon" title="Remove" aria-label="Remove leave type" onClick={() => setConfirm(t)}>
               <Icon name="trash" size={16} />
             </button>
           )}
@@ -93,7 +102,7 @@ export default function LeaveTypes() {
         actions={<Button variant="primary" onClick={openNew}><Icon name="plus" size={16} /> New Type</Button>}
       />
 
-      <DataTable columns={columns} rows={types} loading={isLoading} pageSize={15} emptyTitle="No leave types" emptyIcon="🗂️" rowKey={(t) => t._id} />
+      <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15} emptyTitle="No leave types" emptyIcon="🗂️" rowKey={(t) => t._id} />
 
       <Drawer
         open={!!editing}
@@ -130,9 +139,9 @@ export default function LeaveTypes() {
 
       <ConfirmDialog
         open={!!confirm}
-        title="Deactivate leave type?"
-        message={confirm ? `"${confirm.name}" will be hidden from new leave entries. Existing records are kept.` : ""}
-        confirmLabel="Deactivate"
+        title="Remove leave type?"
+        message={confirm ? `"${confirm.name}" will be removed from the list and from new leave entries. Existing leave records are kept.` : ""}
+        confirmLabel="Remove"
         loading={del.isPending}
         onCancel={() => setConfirm(null)}
         onConfirm={async () => { await del.mutateAsync(confirm._id); setConfirm(null); }}

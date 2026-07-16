@@ -10,8 +10,8 @@ import { computeOtSummary, computeOdSummary, mostRecent } from "../../utils/leav
 // OD-by-emp) — no new APIs, no duplicated calculations. Compact cards in the
 // existing GuardHub design system.
 //
-// props: { emp, year, selectedTypeCode?, projectedDays?, highlightComp? }
-export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, projectedDays, highlightComp }) {
+// props: { emp, year, selectedTypeCode?, projectedDays? }
+export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, projectedDays }) {
   const empId = emp?.empId;
   const { data: bal, isLoading: balLoading } = useLeaveBalances(year, empId, { enabled: !!empId });
   const { data: otRecords = [] } = useOtByEmp(empId);
@@ -26,7 +26,7 @@ export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, proj
   const od = computeOdSummary(odRecords);
 
   // Comp Off comes through the balance as the COMP type: allocated = earned from
-  // approved OT (derived server-side), used = Comp Off leaves taken.
+  // OT (every entry, derived server-side), used = Comp Off portion of leaves taken.
   const comp = byType.find((b) => b.leaveTypeCode === "COMP");
   const compAvail = comp ? comp.remaining : ot.compOff;
   const compSelected = selectedTypeCode === "COMP";
@@ -82,24 +82,11 @@ export default function EmployeeLeaveSummary({ emp, year, selectedTypeCode, proj
 
       {/* OT + OD Summary (side by side) */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
-        <div
-          className="card"
-          style={{
-            padding: 12,
-            ...(highlightComp
-              ? { borderColor: "var(--danger, #dc2626)", boxShadow: "0 0 0 2px var(--danger, #dc2626)" }
-              : {}),
-          }}
-        >
+        <div className="card" style={{ padding: 12 }}>
           <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 8 }}>OT / Comp Off</div>
-          {highlightComp && (
-            <div className="text-sm" style={{ color: "var(--danger, #dc2626)", fontWeight: 600, marginBottom: 6 }}>
-              Insufficient Comp Off balance
-            </div>
-          )}
           <MiniRow label="OT Entries" value={ot.entries} />
           <MiniRow label="OT Days" value={ot.totalDays} />
-          <MiniRow label="Earned" value={comp ? comp.allocated : ot.compOff} hint="approved OT" />
+          <MiniRow label="Earned" value={comp ? comp.allocated : ot.compOff} hint="from OT" />
           <MiniRow label="Used" value={comp ? comp.used : 0} />
           <MiniRow
             label="Comp Off Avail"

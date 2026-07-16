@@ -14,6 +14,10 @@ import { useLeaveTransactions, useDeleteLeaveTxn } from "../hooks/useLeaveV2";
 import { useEmployees } from "../hooks/useEmployees";
 import { formatDate, formatDateTime } from "../utils/date";
 import { exportTableCsv } from "../utils/exportCsv";
+import { leaveTypeLabel } from "../utils/leaveDeduction";
+
+// Negative-balance figure for a leave: signed (-lopDays) when it over-drew, else 0.
+const negBalance = (l) => (l.lopDays > 0 ? -l.lopDays : 0);
 
 // View Leaves — leave transaction management (like View OT / View OD). Every
 // leave is a finalized record (single-admin, no approval), so there is no status
@@ -67,12 +71,31 @@ export default function ViewLeaves() {
         { label: "Designation", value: (l) => l._desig },
       ],
     },
-    { key: "leaveTypeName", header: "Leave Type", render: (l) => <Badge status="leave">{l.leaveTypeName}</Badge>, exportValue: (l) => l.leaveTypeName },
+    {
+      key: "leaveTypeName", header: "Leave Type",
+      render: (l) => <Badge status="leave">{leaveTypeLabel(l)}</Badge>,
+      // Actual selected type AND the custom name (for Others) both preserved.
+      exportCols: [
+        { label: "Leave Type", value: (l) => leaveTypeLabel(l) },
+        { label: "Custom Leave Name", value: (l) => l.customLeaveName || "" },
+      ],
+    },
     { key: "shiftType", header: "Shift", render: (l) => l.shiftType || "—", exportValue: (l) => l.shiftType },
     { key: "fromDate", header: "From", sortable: true, sortValue: (l) => new Date(l.fromDate).getTime(), render: (l) => formatDate(l.fromDate), exportLabel: "From Date", exportValue: (l) => formatDate(l.fromDate) },
     { key: "toDate", header: "To", render: (l) => formatDate(l.toDate), exportLabel: "To Date", exportValue: (l) => formatDate(l.toDate) },
     { key: "dayType", header: "Duration", render: (l) => l.dayType || "—", exportValue: (l) => l.dayType },
-    { key: "days", header: "Days", className: "num", sortable: true, render: (l) => <strong>{l.days}</strong>, exportLabel: "Number of Days", exportValue: (l) => l.days },
+    {
+      key: "days", header: "Days", className: "num", sortable: true, render: (l) => <strong>{l.days}</strong>,
+      // Requested days + the parts of the breakdown not shown as their own column.
+      exportCols: [
+        { label: "Requested Days", value: (l) => l.days },
+        { label: "Remaining CL", value: (l) => l.remainingCl ?? 0 },
+        { label: "Remaining Comp Off", value: (l) => l.remainingComp ?? 0 },
+        { label: "Negative Balance", value: (l) => negBalance(l) },
+      ],
+    },
+    { key: "clUsed", header: "CL Used", className: "num", render: (l) => l.clUsed ?? 0, exportValue: (l) => l.clUsed ?? 0 },
+    { key: "compUsed", header: "Comp Off", className: "num", render: (l) => l.compUsed ?? 0, exportLabel: "Comp Off Used", exportValue: (l) => l.compUsed ?? 0 },
     {
       key: "reason", header: "Reason",
       render: (l) => (
@@ -133,15 +156,26 @@ export default function ViewLeaves() {
             <section>
               <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 6 }}>Leave Information</div>
               <dl className="detail-grid">
-                <Row k="Leave Type" v={viewTxn.leaveTypeName} />
+                <Row k="Leave Type" v={leaveTypeLabel(viewTxn)} />
+                {viewTxn.customLeaveName && <Row k="Custom Leave Name" v={viewTxn.customLeaveName} />}
                 <Row k="Shift" v={viewTxn.shiftType || "—"} />
                 <Row k="From Date" v={formatDate(viewTxn.fromDate)} />
                 <Row k="To Date" v={formatDate(viewTxn.toDate)} />
-                <Row k="Days" v={viewTxn.days} />
+                <Row k="Requested Days" v={viewTxn.days} />
                 <Row k="Duration" v={viewTxn.dayType || "—"} />
                 <Row k="Pay" v={viewTxn.isPaid ? "Paid" : "Unpaid (LOP)"} />
                 <Row k="Reason" v={viewTxn.reason || "—"} />
                 <Row k="Created Date" v={formatDateTime(viewTxn.createdAt)} />
+              </dl>
+            </section>
+            <section>
+              <div className="text-sm muted" style={{ fontWeight: 600, marginBottom: 6 }}>Deduction Breakdown</div>
+              <dl className="detail-grid">
+                <Row k="CL Used" v={viewTxn.clUsed ?? 0} />
+                <Row k="Comp Off Used" v={viewTxn.compUsed ?? 0} />
+                <Row k="Remaining CL" v={viewTxn.remainingCl ?? 0} />
+                <Row k="Remaining Comp Off" v={viewTxn.remainingComp ?? 0} />
+                <Row k="Negative Balance" v={negBalance(viewTxn)} />
               </dl>
             </section>
           </div>
@@ -153,7 +187,7 @@ export default function ViewLeaves() {
       <ConfirmDialog
         open={!!delTxn}
         title="Delete leave record?"
-        message={delTxn ? `Delete ${delTxn._name}'s ${delTxn.leaveTypeName} (${delTxn.days} day(s))? Balance is restored.` : ""}
+        message={delTxn ? `Delete ${delTxn._name}'s ${leaveTypeLabel(delTxn)} (${delTxn.days} day(s))? Balance is restored.` : ""}
         confirmLabel="Delete"
         loading={del.isPending}
         onCancel={() => setDelTxn(null)}

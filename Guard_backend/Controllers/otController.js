@@ -77,7 +77,8 @@ const applyOt = async (req, res) => {
       location: req.body.location,
       reason: req.body.reason,
       remarks: req.body.remarks || "",
-      status: req.body.status || "Pending",
+      // No approval workflow — an admin-entered OT is already worked/confirmed.
+      status: "Approved",
     });
 
     const saved = await newOt.save();

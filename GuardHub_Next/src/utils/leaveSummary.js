@@ -22,17 +22,13 @@ export function inclusiveDays(from, to) {
   return Math.round((tu - fu) / 86400000) + 1;
 }
 
-// OT summary. `compOff` = days from APPROVED OT (org policy: completed OT earns
-// compensatory leave), so it's a derived, read-only figure from existing data.
+// OT summary. `compOff` = days earned from OT. There is no approval workflow —
+// recording an OT entry means the overtime was worked, so EVERY entry earns Comp
+// Off (req 3). Derived, read-only figure from existing data.
 export function computeOtSummary(records = []) {
   let totalDays = 0;
-  let compOff = 0;
-  for (const r of records) {
-    const d = otRecordDays(r);
-    totalDays += d;
-    if (String(r?.status || "").toLowerCase() === "approved") compOff += d;
-  }
-  return { entries: records.length, totalDays, compOff };
+  for (const r of records) totalDays += otRecordDays(r);
+  return { entries: records.length, totalDays, compOff: totalDays };
 }
 
 // OD summary (entries + total inclusive OD days).
@@ -40,16 +36,6 @@ export function computeOdSummary(records = []) {
   let totalDays = 0;
   for (const r of records) totalDays += inclusiveDays(r?.empFromDate, r?.empToDate);
   return { entries: records.length, totalDays };
-}
-
-// Comp Off days currently AVAILABLE for an employee, read from a leave-balances
-// API payload (data[0].byType, COMP type). remaining = earned(OT) - used. This
-// is the single source the Apply Leave guard and the summary panel both use so
-// the "available" number can't drift. Returns 0 when unknown.
-export function compOffRemaining(balData) {
-  const row = balData?.data?.[0];
-  const comp = row?.byType?.find((b) => b.leaveTypeCode === "COMP");
-  return comp ? comp.remaining : 0;
 }
 
 // Most-recent item by a date field (createdAt first, then a fallback field).

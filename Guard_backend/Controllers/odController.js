@@ -1,8 +1,37 @@
 const od = require("../models/odScheme");
+const Roster = require("../models/rosterScheme");
 const {
   resolveActiveEmployee,
   getActiveEmployeeIds,
 } = require("../utils/employeeRef");
+const {
+  computeApplicableDays,
+  weeklyOffIndexesFromRoster,
+} = require("../utils/workingDays");
+const { findConflict } = require("../utils/dateOverlap");
+
+// The employee's weekly-off weekday indexes (from their roster) — the same
+// exclusion Leave uses, so both count applicable days identically.
+async function weeklyOffForEmp(empId) {
+  const roster = await Roster.findOne({ empId: String(empId) }).lean();
+  return weeklyOffIndexesFromRoster(roster?.weeklyShifts);
+}
+
+const ALL_WEEKOFF_MSG =
+  "The selected dates fall entirely on the employee's weekly off day(s) — there are no OD days to apply.";
+
+// Reject an OD whose dates overlap an existing OD for the same employee. OD has
+// no FIRST/SECOND half concept, so any calendar overlap is a conflict.
+async function odOverlapError(empId, from, to, excludeId) {
+  const q = { empId, empFromDate: { $lte: new Date(to) }, empToDate: { $gte: new Date(from) } };
+  if (excludeId) q._id = { $ne: excludeId };
+  const existing = await od.find(q).select("empFromDate empToDate odLocation").lean();
+  const clash = findConflict(from, to, "FULL DAY", existing.map((e) => ({
+    from: e.empFromDate, to: e.empToDate, dayType: "FULL DAY", ref: e,
+  })));
+  if (!clash) return null;
+  return `This overlaps an existing OD (${String(clash.ref.empFromDate).slice(0, 10)} to ${String(clash.ref.empToDate).slice(0, 10)}) for this employee.`;
+}
 
 // Add new od request
 const addOd = async (req, res) => {
@@ -12,6 +41,8 @@ const addOd = async (req, res) => {
       empFromDate,
       empToDate,
       empShiftType,
+      additionalShift,
+      workingDuration,
       empOdType,
       empPurpose,
       odLocation,
@@ -22,19 +53,39 @@ const addOd = async (req, res) => {
     if (!check.ok) {
       return res.status(check.status).json({ message: check.message });
     }
+    const empIdNum = check.employee.empId;
+
+    // Applicable OD days = calendar days minus the employee's weekly offs.
+    const weeklyOff = await weeklyOffForEmp(empIdNum);
+    const calc = computeApplicableDays(empFromDate, empToDate, {
+      weeklyOff,
+      halfDay: /half/i.test(workingDuration || ""),
+    });
+    if (!calc) {
+      return res.status(400).json({ message: "Invalid date range (To date must be on/after From date)." });
+    }
+    if (calc.actualDays <= 0) {
+      return res.status(400).json({ message: ALL_WEEKOFF_MSG });
+    }
+
+    const overlap = await odOverlapError(empIdNum, empFromDate, empToDate, null);
+    if (overlap) return res.status(409).json({ message: overlap });
 
     const newOd = new od({
-      empId,
+      empId: empIdNum,
       empFromDate,
       empToDate,
       empShiftType,
-      empOdType,
+      additionalShift: additionalShift || "",
+      workingDuration: workingDuration || "",
+      empOdType: empOdType || "",
       empPurpose,
       odLocation: odLocation || "Not Specified",
+      days: calc.actualDays,
     });
 
     await newOd.save();
-    res.status(201).json({ message: "od added successfully" });
+    res.status(201).json({ message: "od added successfully", data: newOd });
   } catch (error) {
     console.error("Error adding od:", error);
     res.status(500).json({ message: "Error adding od", error });
@@ -95,24 +146,43 @@ const deleteOdById = async (req, res) => {
 //update od by empId
 const updateOdById = async (req, res) => {
   try {
-    const updatedOd = await od.findOneAndUpdate(
-      { _id: req.params.id },
-      req.body,
-      { new: true, runValidators: true }
-    );
-
-    if (!updatedOd) {
-      return res
-        .status(404)
-        .json({ message: "Leave record not found for this employee" });
+    const existing = await od.findById(req.params.id);
+    if (!existing) {
+      return res.status(404).json({ message: "OD record not found for this employee" });
     }
 
-    res
-      .status(200)
-      .json({ message: "Leave updated successfully", data: updatedOd });
+    const update = { ...req.body };
+
+    // Recompute applicable days from the effective range + duration + roster so
+    // the stored day count stays consistent with an edit (same engine as Apply).
+    const from = update.empFromDate || existing.empFromDate;
+    const to = update.empToDate || existing.empToDate;
+    const duration = update.workingDuration !== undefined ? update.workingDuration : existing.workingDuration;
+    const weeklyOff = await weeklyOffForEmp(existing.empId);
+    const calc = computeApplicableDays(from, to, {
+      weeklyOff,
+      halfDay: /half/i.test(duration || ""),
+    });
+    if (!calc) {
+      return res.status(400).json({ message: "Invalid date range (To date must be on/after From date)." });
+    }
+    if (calc.actualDays <= 0) {
+      return res.status(400).json({ message: ALL_WEEKOFF_MSG });
+    }
+
+    const overlap = await odOverlapError(existing.empId, from, to, existing._id);
+    if (overlap) return res.status(409).json({ message: overlap });
+    update.days = calc.actualDays;
+
+    const updatedOd = await od.findByIdAndUpdate(req.params.id, update, {
+      new: true,
+      runValidators: true,
+    });
+
+    res.status(200).json({ message: "OD updated successfully", data: updatedOd });
   } catch (error) {
-    console.error("Error updating leave:", error);
-    res.status(500).json({ message: "Failed to update leave", error });
+    console.error("Error updating OD:", error);
+    res.status(500).json({ message: "Failed to update OD", error });
   }
 };
 // get number count no of od

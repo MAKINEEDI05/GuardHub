@@ -7,7 +7,7 @@
 //   Leave    -> leave_transactions (carries the leave-type code; kept in lock-
 //               step with the legacy leave_mgmts the Month-Wise report reads)
 //   OD       -> od_mgmt
-//   OT       -> APPROVED ot_mgmt
+//   OT       -> ot_mgmt (every entry — no approval workflow)
 //   Week Off -> roster_mgmt weekly week-off weekdays
 //
 // The Attendance Muster Roll report and the (future) Salary module both consume
@@ -86,9 +86,9 @@ async function buildMonthlyGrid(year, month, employees) {
       empFromDate: { $lte: endBoundary },
       empToDate: { $gte: startBoundary },
     }).lean(),
+    // Every OT entry counts — there is no approval workflow (req 3).
     ot_mgmt.find({
       employeeId: { $in: idList },
-      status: "Approved",
       fromDate: { $lte: endBoundary },
       toDate: { $gte: startBoundary },
     }).lean(),
@@ -102,8 +102,12 @@ async function buildMonthlyGrid(year, month, employees) {
   for (const l of leaves) {
     if (!leaveByEmp.has(l.empId)) leaveByEmp.set(l.empId, new Map());
     const m = leaveByEmp.get(l.empId);
+    // "Others" leaves show a short "OTH" token in the day grid (the full custom
+    // name is impractical in a single cell; it appears in every other view).
+    const code = String(l.leaveTypeCode || "L").toUpperCase();
+    const cell = code === "OTHERS" ? "OTH" : code;
     for (const d of coveredDayNums(l.fromDate, l.toDate, year, month, dim)) {
-      m.set(d, String(l.leaveTypeCode || "L").toUpperCase());
+      m.set(d, cell);
     }
   }
 
@@ -154,9 +158,12 @@ async function buildMonthlyGrid(year, month, employees) {
       const ot = otDays.has(d);
       const wo = weekOffIdx.has(weekday);
 
+      // A weekly-off day is NOT consumed by a leave/OD (those day counts exclude
+      // weekly offs — see utils/workingDays), so on a week-off day leave/OD are
+      // suppressed and the day reads WO. Present/OT still show (actual work).
       if (present) statuses.push("P");
-      if (leaveCode) statuses.push(leaveCode);
-      if (od) statuses.push("OD");
+      if (leaveCode && !wo) statuses.push(leaveCode);
+      if (od && !wo) statuses.push("OD");
       if (ot) statuses.push("OT");
 
       if (statuses.length === 0) {
@@ -169,21 +176,17 @@ async function buildMonthlyGrid(year, month, employees) {
 
       // Tally (a combined day counts toward each of its components)
       if (present) summary.present += 1;
-      if (leaveCode) summary.leave += 1;
-      if (od) summary.od += 1;
+      if (leaveCode && !wo) summary.leave += 1;
+      if (od && !wo) summary.od += 1;
       if (ot) summary.ot += 1;
       if (statuses.length === 1 && statuses[0] === "WO") summary.weekOff += 1;
       if (statuses.length === 1 && statuses[0] === "A") summary.absent += 1;
     }
 
     // Working Days = expected working days (month minus week-offs/holidays).
-    // Net Payable Days = every accounted, non-absent day that counts for pay
-    // (present + leave + OD + week-off + holiday). OT is extra (earns comp-off),
-    // not a base payable day. The Salary module can refine these on top of the
-    // same grid without recomputing attendance.
+    // (Net Payable was removed — it is a payroll-policy figure that belongs to
+    // the Salary module, not this attendance grid, and was reported as incorrect.)
     summary.workingDays = dim - summary.weekOff - summary.holiday;
-    summary.netPayable =
-      summary.present + summary.leave + summary.od + summary.weekOff + summary.holiday;
 
     byEmp.set(e.empId, { days, summary });
   }

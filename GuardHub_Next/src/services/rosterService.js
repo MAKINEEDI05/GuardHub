@@ -11,6 +11,18 @@ export const rosterService = {
     return Array.isArray(data) ? data : [];
   },
 
+  // One employee's weekly roster (or null if they aren't rostered). The backend
+  // returns an array; we take the first entry. A 404 (no roster) resolves to null.
+  async byEmp(empId) {
+    try {
+      const { data } = await apiClient.get(ENDPOINTS.rosterByEmp(empId));
+      return Array.isArray(data) ? data[0] || null : data || null;
+    } catch (e) {
+      if (e?.response?.status === 404) return null;
+      throw e;
+    }
+  },
+
   async add(payload) {
     const { data } = await apiClient.post(ENDPOINTS.addRoster, payload);
     return data;

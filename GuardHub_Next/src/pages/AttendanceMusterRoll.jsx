@@ -20,7 +20,6 @@ const SUMMARY_COLS = [
   { key: "od", label: "OD" },
   { key: "ot", label: "OT" },
   { key: "workingDays", label: "Working Days" },
-  { key: "netPayable", label: "Net Payable" },
 ];
 const SUM_W = 78; // px per summary column (used for right-sticky offsets)
 const LEGEND = "P=Present  A=Absent  CL/SPL/SUM/HOL=Leave  OD=On Duty  OT=Overtime  WO=Week Off  H=Holiday  ( / = combined)";
@@ -65,9 +64,15 @@ export default function AttendanceMusterRoll() {
 
   const exportCsv = () => {
     if (!rows.length) return;
+
+    // Day columns carry the full date (dd/mm/yyyy) so the month/year is explicit
+    // in every column — no separate title row needed.
+    const mm = String(applied.month).padStart(2, "0");
+    const dateHeader = (d) => `${String(d).padStart(2, "0")}/${mm}/${applied.year}`;
+
     const header = [
       "S.No", "Employee ID", "Employee Name",
-      ...dayColumns.map(String),
+      ...dayColumns.map(dateHeader),
       ...SUMMARY_COLS.map((c) => c.label),
     ];
     const body = rows.map((r) => [
@@ -75,7 +80,11 @@ export default function AttendanceMusterRoll() {
       ...dayColumns.map((d) => r.days?.[d] || ""),
       ...SUMMARY_COLS.map((c) => r.summary?.[c.key] ?? 0),
     ]);
-    downloadCsvMatrix(`muster-roll-${applied.year}-${String(applied.month).padStart(2, "0")}.csv`, [header, ...body]);
+
+    downloadCsvMatrix(
+      `muster-roll-${applied.year}-${mm}.csv`,
+      [header, ...body]
+    );
     toast.success(`Exported ${rows.length} employees`);
   };
 
@@ -156,7 +165,7 @@ export default function AttendanceMusterRoll() {
                         return <td key={d} className={`mr-day ${cellClass(v)}`}>{v}</td>;
                       })}
                       {SUMMARY_COLS.map((c, i) => (
-                        <td key={c.key} className="mr-sticky-right mr-sum" style={{ right: rightOffset(i), width: SUM_W, minWidth: SUM_W, fontWeight: c.key === "netPayable" ? 700 : 500 }}>
+                        <td key={c.key} className="mr-sticky-right mr-sum" style={{ right: rightOffset(i), width: SUM_W, minWidth: SUM_W, fontWeight: c.key === "workingDays" ? 700 : 500 }}>
                           {r.summary?.[c.key] ?? 0}
                         </td>
                       ))}

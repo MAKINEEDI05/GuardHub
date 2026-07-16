@@ -57,7 +57,6 @@ export default function LeaveManagement() {
 
   const { data = { data: [], totals: {} }, isLoading, isError } = useLeaveManage(activeFilters);
   const rows = data.data;
-  const totals = data.totals || {};
 
   const isFiltered = !!(applied.empId || applied.fromDate || applied.toDate ||
     applied.department || applied.designation || applied.month || applied.leaveTypeCode);
@@ -146,7 +145,6 @@ export default function LeaveManagement() {
     <>
       <PageHeader
         title="Leave Management"
-        subtitle={`${totals.employees ?? 0} employees · ${totals.taken ?? 0} days taken · ${applied.year}`}
         actions={
           <>
             <Link className="btn btn--outline" to="/leaves/view"><Icon name="calendar-month" size={16} /> View Leaves</Link>

@@ -7,6 +7,17 @@ export function useRosters() {
   return useQuery({ queryKey: QK.rosters, queryFn: rosterService.list });
 }
 
+// One employee's weekly roster (used to auto-fill the current shift on Apply OD).
+export function useRosterByEmp(empId, opts = {}) {
+  return useQuery({
+    queryKey: QK.rosterByEmp(empId),
+    queryFn: () => rosterService.byEmp(empId),
+    enabled: !!empId,
+    staleTime: 5 * 60_000,
+    ...opts,
+  });
+}
+
 export function useAddRoster() {
   const qc = useQueryClient();
   return useMutation({

@@ -1,6 +1,10 @@
 import { formatDate, formatDateTime } from "./date";
 import { downloadCsvMatrix } from "./csv";
+import { leaveTypeLabel } from "./leaveDeduction";
 import { toast } from "../store/toastStore";
+
+// Signed negative-balance figure for a leave (0 when fully funded).
+const negBalance = (l) => (l.lopDays > 0 ? -l.lopDays : 0);
 
 // Single source of truth for the Employee Leave "detail" view. Both the
 // Employee Details Drawer and the detailed CSV export shape their data through
@@ -64,16 +68,26 @@ export function leaveDetailToCsvMatrix(detail) {
   m.push([]);
 
   m.push(["LEAVE HISTORY"]);
-  m.push(["Leave Type", "From Date", "To Date", "Number of Days", "Duration", "Shift", "Reason", "Created Date"]);
+  m.push([
+    "Leave Type", "Custom Leave Name", "From Date", "To Date", "Requested Days",
+    "CL Used", "Comp Off Used", "Remaining CL", "Remaining Comp Off", "Negative Balance",
+    "Duration", "Shift", "Reason", "Created Date",
+  ]);
   if (detail.history.length === 0) {
     m.push(["No leave records for the current filters"]);
   } else {
     detail.history.forEach((l) =>
       m.push([
-        l.leaveTypeName,
+        leaveTypeLabel(l),
+        l.customLeaveName || "",
         formatDate(l.fromDate),
         formatDate(l.toDate),
         l.days,
+        l.clUsed ?? 0,
+        l.compUsed ?? 0,
+        l.remainingCl ?? 0,
+        l.remainingComp ?? 0,
+        negBalance(l),
         l.dayType || "",
         l.shiftType || "",
         l.reason || "",

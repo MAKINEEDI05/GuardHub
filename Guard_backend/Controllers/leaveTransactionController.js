@@ -1,18 +1,75 @@
 const LeaveTransaction = require("../models/leaveTransactionScheme");
 const LeaveType = require("../models/leaveTypeScheme");
 const Leave = require("../models/leaveScheme"); // legacy leave_mgmt (compat)
+const Roster = require("../models/rosterScheme");
 const { resolveActiveEmployee, getActiveEmployeeIds } = require("../utils/employeeRef");
-const { computeLeaveDays } = require("../utils/leaveDays");
+const {
+  computeApplicableDays,
+  weeklyOffIndexesFromRoster,
+} = require("../utils/workingDays");
+const { findConflict } = require("../utils/dateOverlap");
+const {
+  computeDeduction,
+  validateCustomLeaveName,
+  CL_CODE,
+  COMP_CODE,
+  OTHERS_CODE,
+  round2,
+} = require("../utils/leaveDeduction");
 const {
   adjustBalanceUsed,
-  getRemainingForType,
-  COMP_CODE,
+  getClCompRemaining,
 } = require("./leaveBalanceController");
 
+// The employee's weekly-off weekday indexes (from their roster). Excluded from
+// every leave/OD day count so a range that spans a week-off charges fewer days.
+async function weeklyOffForEmp(empId) {
+  const roster = await Roster.findOne({ empId: String(empId) }).lean();
+  return weeklyOffIndexesFromRoster(roster?.weeklyShifts);
+}
+
+// Message shown when a range collapses to zero applicable days (all weekly off).
+const ALL_WEEKOFF_MSG =
+  "The selected dates fall entirely on the employee's weekly off day(s) — there are no leave days to apply.";
+
+// Reject a leave whose dates overlap an existing leave for the same employee
+// (prevents double-deduction). Complementary half-days on one day are allowed.
+// `excludeId` skips the record being edited. Returns an error string, or null.
+async function leaveOverlapError(empId, from, to, dayType, excludeId) {
+  const q = { empId, fromDate: { $lte: to }, toDate: { $gte: from } };
+  if (excludeId) q._id = { $ne: excludeId };
+  const existing = await LeaveTransaction.find(q)
+    .select("fromDate toDate dayType leaveTypeName customLeaveName")
+    .lean();
+  const clash = findConflict(from, to, dayType, existing.map((e) => ({
+    from: e.fromDate, to: e.toDate, dayType: e.dayType, ref: e,
+  })));
+  if (!clash) return null;
+  const name = clash.ref.customLeaveName || clash.ref.leaveTypeName || "leave";
+  return `This overlaps an existing ${name} (${String(clash.ref.fromDate).slice(0, 10)} to ${String(clash.ref.toDate).slice(0, 10)}) for this employee.`;
+}
+
+// Debit CL then Comp Off for one leave's split (seeding CL's allocation from its
+// default quota on first touch so a fresh balance row still reflects the real
+// entitlement). Pass negated used values to reverse a leave. The single place a
+// leave mutates the ledger — Comp Off's `defaultQuota` is 0 because its
+// allocation is derived from OT, never stored.
+async function applyDeductionToBalance(empId, year, { clUsed, compUsed }, clQuota) {
+  if (clUsed) {
+    await adjustBalanceUsed({ empId, year, leaveTypeCode: CL_CODE, days: clUsed, defaultQuota: clQuota });
+  }
+  if (compUsed) {
+    await adjustBalanceUsed({ empId, year, leaveTypeCode: COMP_CODE, days: compUsed, defaultQuota: 0 });
+  }
+}
+
 // POST /leave/transactions
-// Records ONE leave: creates the transaction, debits the balance, and mirrors a
-// legacy leave_mgmt row so the existing attendance cron + month-wise report keep
-// flagging the day as "Leave" with no change to those modules.
+// Records ONE leave: resolves the deduction (CL → Comp Off, req 4), creates the
+// transaction with its breakdown, debits CL/Comp Off, and mirrors a legacy
+// leave_mgmt row so the existing attendance + month-wise report keep flagging the
+// day as "Leave". "Others" (req 2) stores a custom name + explicit day count and
+// touches NO balance. Negative balances are allowed — an over-draw is recorded
+// as the leave's `lopDays`, never blocked (req 6).
 const recordLeave = async (req, res) => {
   let legacy = null;
   let txn = null;
@@ -27,79 +84,99 @@ const recordLeave = async (req, res) => {
     if (!check.ok) return res.status(check.status).json({ message: check.message });
     const empIdNum = check.employee.empId;
 
-    // 2. Leave type must exist and be active.
     if (!leaveTypeCode) return res.status(400).json({ message: "leaveTypeCode is required" });
-    const type = await LeaveType.findOne({
-      code: String(leaveTypeCode).toUpperCase(),
-      active: true,
-    });
-    if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
-
-    // 3. Dates + day count.
     if (!fromDate || !toDate) {
       return res.status(400).json({ message: "fromDate and toDate are required" });
     }
-    const days = computeLeaveDays(fromDate, toDate, dayType);
-    if (days === null || days <= 0) {
+    const from = new Date(`${String(fromDate).slice(0, 10)}T00:00:00.000Z`);
+    const to = new Date(`${String(toDate).slice(0, 10)}T00:00:00.000Z`);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) {
       return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
     }
-
-    const from = new Date(`${String(fromDate).slice(0, 10)}T00:00:00.000Z`);
     const month = from.getUTCMonth() + 1;
     const year = from.getUTCFullYear();
 
-    // 3b. Comp Off can NEVER go negative: a Comp Off leave may consume at most
-    //     the days EARNED from approved OT minus Comp Off already used. Checked
-    //     before writing anything (same balance derivation as every read).
-    if (type.code === COMP_CODE) {
-      const available = await getRemainingForType(empIdNum, year, COMP_CODE);
-      if (days > available) {
-        return res.status(400).json({
-          success: false,
-          message: "Insufficient Comp Off balance.",
-          available,
-          requested: days,
-        });
+    // No overlapping leave for the same employee (double-deduction guard).
+    const overlap = await leaveOverlapError(empIdNum, from, to, dayType, null);
+    if (overlap) return res.status(409).json({ message: overlap });
+
+    const isOthers = String(leaveTypeCode).toUpperCase() === OTHERS_CODE;
+
+    // 2. Resolve the leave's category, day count and deduction split.
+    let leaveTypeName, isPaid, days, customLeaveName = "";
+    let split = { clUsed: 0, compUsed: 0, lopDays: 0, remainingCl: 0, remainingComp: 0 };
+
+    if (isOthers) {
+      const nameCheck = validateCustomLeaveName(req.body.customLeaveName);
+      if (!nameCheck.ok) return res.status(400).json({ message: nameCheck.message });
+      customLeaveName = nameCheck.value;
+      days = round2(req.body.days);
+      if (!days || days <= 0) {
+        return res.status(400).json({ message: "Number of days must be greater than 0." });
       }
+      leaveTypeName = customLeaveName; // shown wherever the leave type appears
+      isPaid = true; // informational leave; no balance impact
+    } else {
+      const type = await LeaveType.findOne({ code: String(leaveTypeCode).toUpperCase(), active: true });
+      if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
+      // Applicable days = calendar days minus the employee's weekly offs.
+      const weeklyOff = await weeklyOffForEmp(empIdNum);
+      const calc = computeApplicableDays(fromDate, toDate, { weeklyOff, halfDay: /HALF/i.test(dayType) });
+      if (!calc) {
+        return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
+      }
+      if (calc.actualDays <= 0) {
+        return res.status(400).json({ message: ALL_WEEKOFF_MSG });
+      }
+      days = calc.actualDays;
+      leaveTypeName = type.name;
+      isPaid = type.isPaid;
+      // Fund CL first, then Comp Off, against the live remaining (same source as
+      // every balance read). Any overflow becomes lopDays — never blocked.
+      const { cl, comp } = await getClCompRemaining(empIdNum, year);
+      split = computeDeduction(days, cl, comp);
     }
 
-    // 4. Legacy mirror (keeps attendance/reporting working).
+    // 3. Legacy mirror (keeps attendance/reporting working). For Others the
+    //    custom name is the leave label the month-wise report reads.
     legacy = await Leave.create({
       empId: empIdNum,
-      empLeaveType: type.name,
+      empLeaveType: leaveTypeName,
       empFromDate: from,
-      empToDate: new Date(`${String(toDate).slice(0, 10)}T00:00:00.000Z`),
+      empToDate: to,
       empShiftType: shiftType,
       empOdType: dayType,
       empReason: reason || "Leave",
     });
 
-    // 5. The authoritative transaction.
+    // 4. The authoritative transaction (carries the breakdown snapshot).
     txn = await LeaveTransaction.create({
       empId: empIdNum,
-      leaveTypeCode: type.code,
-      leaveTypeName: type.name,
-      isPaid: type.isPaid,
-      fromDate: legacy.empFromDate,
-      toDate: legacy.empToDate,
+      leaveTypeCode: isOthers ? OTHERS_CODE : String(leaveTypeCode).toUpperCase(),
+      leaveTypeName,
+      customLeaveName,
+      isPaid,
+      fromDate: from,
+      toDate: to,
       days,
       month,
       year,
       dayType,
       shiftType,
       reason,
+      clUsed: split.clUsed,
+      compUsed: split.compUsed,
+      lopDays: split.lopDays,
+      remainingCl: split.remainingCl,
+      remainingComp: split.remainingComp,
       legacyLeaveId: legacy._id,
     });
 
-    // 6. Debit the balance (auto-creates the row, seeding allocation from the
-    //    type's default quota if no formal allocation has been run yet).
-    await adjustBalanceUsed({
-      empId: empIdNum,
-      year,
-      leaveTypeCode: type.code,
-      days,
-      defaultQuota: type.defaultAnnualQuota || 0,
-    });
+    // 5. Debit CL/Comp Off (nothing for Others).
+    if (!isOthers) {
+      const clQuota = await clDefaultQuota();
+      await applyDeductionToBalance(empIdNum, year, split, clQuota);
+    }
 
     return res.status(201).json({ message: "Leave recorded", data: txn });
   } catch (error) {
@@ -110,6 +187,13 @@ const recordLeave = async (req, res) => {
     return res.status(500).json({ message: "Failed to record leave", error: error.message });
   }
 };
+
+// CL's configured annual quota, used to seed a fresh balance row's CL allocation
+// so the deduction sees the real entitlement even before any allocation run.
+async function clDefaultQuota() {
+  const cl = await LeaveType.findOne({ code: CL_CODE }).lean();
+  return cl?.defaultAnnualQuota || 0;
+}
 
 // GET /leave/transactions?empId&month&year&leaveTypeCode&fromDate&toDate
 // Leave history / list. Only surfaces active employees' records.
@@ -140,68 +224,86 @@ const listTransactions = async (req, res) => {
 };
 
 // PUT /leave/transactions/:id — edit a finalized leave (single-admin, no
-// approval). Editable: leaveTypeCode, shiftType, fromDate, toDate, dayType,
-// reason. Rebalances (reverse the old debit, apply the new one — handles a
-// changed type/year/day-count) and keeps the legacy mirror in sync. The
-// employee is NOT changed here.
+// approval). Editable: leaveTypeCode (incl. Others), customLeaveName, shiftType,
+// fromDate, toDate, dayType, days (Others), reason. Rebalances by REVERSING this
+// transaction's own CL/Comp Off debit first, then recomputing the split against
+// the fresh remaining and re-debiting — so a changed type/year/day-count stays
+// consistent. Negative balances allowed. The employee is NOT changed here.
 const updateLeave = async (req, res) => {
   try {
     const txn = await LeaveTransaction.findById(req.params.id);
     if (!txn) return res.status(404).json({ message: "Leave transaction not found" });
 
     // Merge incoming changes over the existing record.
-    const leaveTypeCode = (req.body.leaveTypeCode || txn.leaveTypeCode).toUpperCase();
+    const nextCode = (req.body.leaveTypeCode || txn.leaveTypeCode).toUpperCase();
     const shiftType = req.body.shiftType !== undefined ? req.body.shiftType : txn.shiftType;
     const dayType = req.body.dayType !== undefined ? req.body.dayType : txn.dayType;
     const reason = req.body.reason !== undefined ? String(req.body.reason).trim() : txn.reason;
     const fromRaw = req.body.fromDate || txn.fromDate;
     const toRaw = req.body.toDate || txn.toDate;
 
-    // Type must still exist + be active (same rule as Apply).
-    const type = await LeaveType.findOne({ code: leaveTypeCode, active: true });
-    if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
-
-    const days = computeLeaveDays(fromRaw, toRaw, dayType);
-    if (days === null || days <= 0) {
-      return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
-    }
     const from = new Date(`${String(fromRaw).slice(0, 10)}T00:00:00.000Z`);
     const to = new Date(`${String(toRaw).slice(0, 10)}T00:00:00.000Z`);
+    if (Number.isNaN(from.getTime()) || Number.isNaN(to.getTime()) || to < from) {
+      return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
+    }
     const month = from.getUTCMonth() + 1;
     const year = from.getUTCFullYear();
 
-    // Comp Off can never go negative on an edit either. Capacity for the new
-    // value is the current remaining PLUS this transaction's own Comp Off debit
-    // (which the rebalance below reverses first) when it was already Comp Off in
-    // the same year.
-    if (type.code === COMP_CODE) {
-      let available = await getRemainingForType(txn.empId, year, COMP_CODE);
-      if (txn.leaveTypeCode === COMP_CODE && txn.year === year) available += txn.days;
-      if (days > available) {
-        return res.status(400).json({
-          success: false,
-          message: "Insufficient Comp Off balance.",
-          available,
-          requested: days,
-        });
+    // No overlapping leave for the same employee (excluding this record itself).
+    const overlap = await leaveOverlapError(txn.empId, from, to, dayType, txn._id);
+    if (overlap) return res.status(409).json({ message: overlap });
+
+    const isOthers = nextCode === OTHERS_CODE;
+
+    let leaveTypeName, isPaid, days, customLeaveName = "";
+    if (isOthers) {
+      const nameCheck = validateCustomLeaveName(
+        req.body.customLeaveName !== undefined ? req.body.customLeaveName : txn.customLeaveName
+      );
+      if (!nameCheck.ok) return res.status(400).json({ message: nameCheck.message });
+      customLeaveName = nameCheck.value;
+      days = round2(req.body.days !== undefined ? req.body.days : txn.days);
+      if (!days || days <= 0) {
+        return res.status(400).json({ message: "Number of days must be greater than 0." });
       }
+      leaveTypeName = customLeaveName;
+      isPaid = true;
+    } else {
+      const type = await LeaveType.findOne({ code: nextCode, active: true });
+      if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
+      const weeklyOff = await weeklyOffForEmp(txn.empId);
+      const calc = computeApplicableDays(fromRaw, toRaw, { weeklyOff, halfDay: /HALF/i.test(dayType) });
+      if (!calc) {
+        return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
+      }
+      if (calc.actualDays <= 0) {
+        return res.status(400).json({ message: ALL_WEEKOFF_MSG });
+      }
+      days = calc.actualDays;
+      leaveTypeName = type.name;
+      isPaid = type.isPaid;
     }
 
-    // Rebalance: reverse the OLD debit, apply the NEW one (covers a changed
-    // type/year/day-count in one consistent step).
-    await adjustBalanceUsed({
-      empId: txn.empId, year: txn.year, leaveTypeCode: txn.leaveTypeCode, days: -txn.days,
-    });
-    await adjustBalanceUsed({
-      empId: txn.empId, year, leaveTypeCode: type.code, days,
-      defaultQuota: type.defaultAnnualQuota || 0,
-    });
+    // Rebalance step 1: reverse THIS transaction's existing CL/Comp Off debit
+    // (using its original year) so the recompute sees the balance without it.
+    await applyDeductionToBalance(txn.empId, txn.year, { clUsed: -txn.clUsed, compUsed: -txn.compUsed });
 
-    // Update the authoritative transaction (snapshots refreshed from the type).
+    // Step 2: recompute the split for the new value against the fresh remaining.
+    let split = { clUsed: 0, compUsed: 0, lopDays: 0, remainingCl: 0, remainingComp: 0 };
+    if (!isOthers) {
+      const { cl, comp } = await getClCompRemaining(txn.empId, year);
+      split = computeDeduction(days, cl, comp);
+      const clQuota = await clDefaultQuota();
+      await applyDeductionToBalance(txn.empId, year, split, clQuota);
+    }
+
+    // Update the authoritative transaction (snapshots refreshed).
     txn.set({
-      leaveTypeCode: type.code,
-      leaveTypeName: type.name,
-      isPaid: type.isPaid,
+      leaveTypeCode: isOthers ? OTHERS_CODE : nextCode,
+      leaveTypeName,
+      customLeaveName,
+      isPaid,
       shiftType,
       dayType,
       reason,
@@ -210,6 +312,11 @@ const updateLeave = async (req, res) => {
       days,
       month,
       year,
+      clUsed: split.clUsed,
+      compUsed: split.compUsed,
+      lopDays: split.lopDays,
+      remainingCl: split.remainingCl,
+      remainingComp: split.remainingComp,
     });
     await txn.save();
 
@@ -219,7 +326,7 @@ const updateLeave = async (req, res) => {
         { _id: txn.legacyLeaveId },
         {
           $set: {
-            empLeaveType: type.name,
+            empLeaveType: leaveTypeName,
             empFromDate: from,
             empToDate: to,
             empShiftType: shiftType,
@@ -237,19 +344,14 @@ const updateLeave = async (req, res) => {
   }
 };
 
-// DELETE /leave/transactions/:id — reverses the balance debit and removes the
-// mirrored legacy row so nothing drifts.
+// DELETE /leave/transactions/:id — reverses this leave's CL/Comp Off debit and
+// removes the mirrored legacy row so nothing drifts. (Others debited nothing.)
 const deleteTransaction = async (req, res) => {
   try {
     const txn = await LeaveTransaction.findById(req.params.id);
     if (!txn) return res.status(404).json({ message: "Leave transaction not found" });
 
-    await adjustBalanceUsed({
-      empId: txn.empId,
-      year: txn.year,
-      leaveTypeCode: txn.leaveTypeCode,
-      days: -txn.days,
-    });
+    await applyDeductionToBalance(txn.empId, txn.year, { clUsed: -txn.clUsed, compUsed: -txn.compUsed });
     if (txn.legacyLeaveId) {
       await Leave.deleteOne({ _id: txn.legacyLeaveId }).catch(() => {});
     }

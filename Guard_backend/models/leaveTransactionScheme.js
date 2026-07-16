@@ -19,7 +19,11 @@ const leaveTransactionSchema = new mongoose.Schema(
     empId: { type: Number, required: true, index: true },
 
     leaveTypeCode: { type: String, required: true, uppercase: true, trim: true },
-    leaveTypeName: { type: String, default: "" }, // snapshot
+    leaveTypeName: { type: String, default: "" }, // snapshot (selected category)
+    // "Others" (req 2): a per-record custom leave name that belongs ONLY to this
+    // transaction. It is NOT a system leave type and never touches any balance.
+    // When set, it is what every view/report/export shows in place of "Others".
+    customLeaveName: { type: String, default: "" },
     isPaid: { type: Boolean, default: true }, // snapshot — salary-facing
 
     fromDate: { type: Date, required: true },
@@ -28,6 +32,18 @@ const leaveTransactionSchema = new mongoose.Schema(
     // Number of leave days this transaction consumes. Supports 0.5 for a
     // half-day. Kept as the authoritative count used to debit the balance.
     days: { type: Number, required: true, min: 0 },
+
+    // Deduction breakdown (req 4/5/8) — how `days` was funded, CL first then
+    // Comp Off, snapshotted at record time so history/exports are immutable and
+    // always agree with what was shown on submit. For "Others" these are all 0
+    // (informational leave, no balance impact).
+    clUsed: { type: Number, default: 0 },
+    compUsed: { type: Number, default: 0 },
+    // Days beyond CL + Comp Off — the unfunded "negative balance" (req 6). >= 0.
+    lopDays: { type: Number, default: 0 },
+    // CL / Comp Off remaining AFTER this deduction (snapshot for the breakdown).
+    remainingCl: { type: Number, default: 0 },
+    remainingComp: { type: Number, default: 0 },
 
     // Derived from fromDate — 1..12 and full year. Indexed for stats/salary.
     month: { type: Number, required: true, min: 1, max: 12 },

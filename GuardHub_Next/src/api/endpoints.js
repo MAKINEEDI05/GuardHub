@@ -50,6 +50,7 @@ export const ENDPOINTS = {
 
   // Roster — mounted at /roster
   rosters: "/roster/get-emp-data",
+  rosterByEmp: (empId) => `/roster/get-guard-shift/${empId}`, // one employee's weekly roster
   addRoster: "/roster/add-emp-shift",
   updateRoster: (empId) => `/roster/update-emp-roster/${empId}`,
   deleteRoster: (empId) => `/roster/guard-delete-byid/${empId}`,

@@ -204,7 +204,7 @@ const getMonthwiseReport = async (req, res) => {
  *   Present Days = unique calendar dates with >=1 biometric log (secattendancelogs)
  *   Leave Days   = days in range covered by leave_mgmts records
  *   OD Days      = days in range covered by od_mgmt records
- *   OT Days      = days in range covered by APPROVED ot_mgmt records
+ *   OT Days      = days in range covered by ot_mgmt records (all entries)
  *   Week Off     = days in range whose weekday is a roster week-off
  *   Absent Days  = totalDaysInRange - present - leave - od - weekOff  (>= 0)
  *
@@ -341,9 +341,8 @@ const getMonthwiseSummary = async (req, res) => {
     const [leaveMap, odMap, otMap] = await Promise.all([
       buildCovered(leave_mgmt, "empId", "empFromDate", "empToDate"),
       buildCovered(od_mgmt, "empId", "empFromDate", "empToDate"),
-      buildCovered(ot_mgmt, "employeeId", "fromDate", "toDate", {
-        status: "Approved",
-      }),
+      // Every OT entry counts — there is no approval workflow (req 3).
+      buildCovered(ot_mgmt, "employeeId", "fromDate", "toDate"),
     ]);
 
     // ---- Week off: per-employee from roster, counted via weekday occurrences -
@@ -363,11 +362,36 @@ const getMonthwiseSummary = async (req, res) => {
     };
 
     // ---- Assemble per-employee rows ------------------------------------------
+    // Weekly-off weekday set for an employee (to exclude those days from the
+    // leave/OD counts — a leave/OD never consumes a weekly off, matching the
+    // stored day count and the muster grid).
+    const weekOffWeekdaysFor = (code) => {
+      const roster = rosterMap.get(code);
+      const set = new Set();
+      if (roster && roster.weeklyShifts) {
+        WEEKDAYS.forEach((d, i) => {
+          if (isWeekOffValue(roster.weeklyShifts[d])) set.add(i);
+        });
+      }
+      return set;
+    };
+    // Count covered dates whose weekday is NOT one of the employee's weekly offs.
+    const countWorkingCovered = (set, offSet) => {
+      if (!set) return 0;
+      let n = 0;
+      for (const key of set) {
+        const dow = new Date(`${key}T00:00:00.000Z`).getUTCDay();
+        if (!offSet.has(dow)) n += 1;
+      }
+      return n;
+    };
+
     let rows = employees.map((e) => {
       const code = String(e.empId);
+      const offSet = weekOffWeekdaysFor(code);
       const presentDays = presentMap.get(code) || 0;
-      const leaveDays = leaveMap.get(e.empId)?.size || 0;
-      const odDays = odMap.get(e.empId)?.size || 0;
+      const leaveDays = countWorkingCovered(leaveMap.get(e.empId), offSet);
+      const odDays = countWorkingCovered(odMap.get(e.empId), offSet);
       const otDays = otMap.get(e.empId)?.size || 0;
       const weekOffDays = weekOffFor(code);
       const absentDays = Math.max(

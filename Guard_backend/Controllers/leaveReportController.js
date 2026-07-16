@@ -2,7 +2,7 @@ const LeaveTransaction = require("../models/leaveTransactionScheme");
 const LeaveType = require("../models/leaveTypeScheme");
 const employe = require("../models/profileScheme");
 const { ACTIVE_FILTER } = require("../utils/employeeRef");
-const { buildYearRows, getBalanceMap, bucket, compOffEarnedMap, COMP_CODE } = require("./leaveBalanceController");
+const { buildYearRows, getBalanceMap, bucket, compOffEarnedMap, CL_CODE, COMP_CODE } = require("./leaveBalanceController");
 const { employeeScopeFilter } = require("../utils/employeeQuery");
 
 // Transaction match shared by the report + manage endpoints. `empIds` scopes to
@@ -23,59 +23,63 @@ function txnMatch(query, empIds) {
 }
 
 // GET /leave/manage — the unified Employee Leave Management dataset.
-// Every filter (search / dept / designation / year / month / date-range / type)
-// is applied on the SERVER, and the per-employee summary + per-type breakdown
-// are computed over the FILTERED transaction set — so the table, the details
-// drawer and the CSV export all show exactly the same filtered numbers.
+// Employee scoping (search / dept / designation) is applied on the SERVER. The
+// per-employee summary + per-type breakdown are the CL + Comp Off BALANCE (the
+// only deductible buckets, req 4/7) read from the same source as every other
+// balance view — so the table, the details drawer and the CSV export always show
+// identical numbers.
 //
-//   allocated = the year's allocation for the selected type(s)
-//   taken     = days in the filtered set (respects date/month/type filters)
-//   remaining = allocated - taken
+//   CL  allocated = the year's CL allocation (default quota until allocated)
+//   COMP allocated = Comp Off EARNED from OT (all entries, derived — req 3)
+//   used      = the CL / Comp Off actually deducted by this employee's leaves
+//   remaining = allocated - used   (may be negative — req 6)
 const getLeaveManagement = async (req, res) => {
   try {
     const year = parseInt(req.query.year, 10) || new Date().getFullYear();
 
-    const [employees, activeTypes] = await Promise.all([
+    const [employees, dbTypes] = await Promise.all([
       employe
         .find(employeeScopeFilter(req.query), {
           empId: 1, empName: 1, empDepartment: 1, empDesignation: 1,
         })
         .lean(),
-      LeaveType.find({ active: true }).sort({ sortOrder: 1, name: 1 }).lean(),
+      LeaveType.find({ active: true, code: { $in: [CL_CODE, COMP_CODE] } }).lean(),
     ]);
+
+    // Stable CL + Comp Off columns (canonical names/quota fallback).
+    const byCode = new Map(dbTypes.map((t) => [t.code, t]));
+    const cols = [
+      { code: CL_CODE, name: byCode.get(CL_CODE)?.name || "Casual Leave" },
+      { code: COMP_CODE, name: byCode.get(COMP_CODE)?.name || "Comp Off" },
+    ];
+    const clQuota = byCode.get(CL_CODE)?.defaultAnnualQuota || 0;
 
     const empIds = employees.map((e) => e.empId);
     if (!empIds.length) {
       return res.status(200).json({
-        year, types: activeTypes, data: [],
+        year, types: cols, data: [],
         totals: { employees: 0, allocated: 0, taken: 0, remaining: 0 },
       });
     }
 
-    // Filtered "taken" days per (employee, type).
-    const takenAgg = await LeaveTransaction.aggregate([
-      { $match: { ...txnMatch(req.query, empIds), year } },
-      { $group: { _id: { empId: "$empId", code: "$leaveTypeCode" }, taken: { $sum: "$days" } } },
-    ]);
-    const takenMap = new Map(takenAgg.map((t) => [`${t._id.empId}|${t._id.code}`, t.taken]));
-
-    // Which type columns to include (all, or just the filtered one).
-    const typeFilter = req.query.leaveTypeCode ? String(req.query.leaveTypeCode).toUpperCase() : null;
-    const cols = typeFilter ? activeTypes.filter((t) => t.code === typeFilter) : activeTypes;
-
-    const hasComp = cols.some((t) => t.code === COMP_CODE);
     const [balMap, compMap] = await Promise.all([
       getBalanceMap(year, empIds),
-      hasComp ? compOffEarnedMap(year, empIds) : Promise.resolve(new Map()),
+      compOffEarnedMap(year, empIds),
     ]);
 
     const data = employees
       .map((e) => {
         const typesObj = balMap.get(e.empId) || {};
         const byType = cols.map((t) => {
-          // Comp Off allocated is EARNED from approved OT (derived), not stored.
-          const allocated = t.code === COMP_CODE ? compMap.get(e.empId) || 0 : bucket(typesObj, t.code).allocated || 0;
-          const used = takenMap.get(`${e.empId}|${t.code}`) || 0;
+          const b = bucket(typesObj, t.code);
+          const hasBucket = Object.prototype.hasOwnProperty.call(typesObj, t.code);
+          const allocated =
+            t.code === COMP_CODE
+              ? compMap.get(e.empId) || 0
+              : hasBucket
+              ? b.allocated || 0
+              : clQuota;
+          const used = b.used || 0;
           return {
             leaveTypeCode: t.code,
             leaveTypeName: t.name,
@@ -109,7 +113,7 @@ const getLeaveManagement = async (req, res) => {
       { employees: 0, allocated: 0, taken: 0, remaining: 0 }
     );
 
-    return res.status(200).json({ year, types: activeTypes, data, totals });
+    return res.status(200).json({ year, types: cols, data, totals });
   } catch (error) {
     console.error("Error building leave management view:", error);
     return res.status(500).json({ message: "Failed to build leave management view" });
