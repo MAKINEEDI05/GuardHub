@@ -11,21 +11,13 @@ import { useApplyOd } from "../hooks/useOds";
 import { useRosterByEmp } from "../hooks/useRoster";
 import { SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
 import { todayYmd } from "../utils/date";
+import { shiftForDate } from "../utils/roster";
 
 // Apply OD: Search Employee → verify → location + OD details → reason → submit.
 // Payload matches the backend OD schema (empId Number; odLocation required —
-// defaults server-side to "Not Specified").
+// defaults server-side to "Not Specified"). The current shift is auto-filled
+// from the employee's roster for the OD date (an OD moves them off that shift).
 const INIT = { empShiftType: "", empOdType: "", empFromDate: "", empToDate: "", odLocation: "", empPurpose: "" };
-
-// Employee's rostered shift for a yyyy-mm-dd date. An OD moves the employee off
-// their normal shift for the day, so this is the "current shift" we pre-fill.
-const WEEKDAYS = ["sunday", "monday", "tuesday", "wednesday", "thursday", "friday", "saturday"];
-function shiftForDate(weeklyShifts, ymd) {
-  if (!weeklyShifts || !ymd) return "";
-  const d = new Date(`${ymd}T00:00:00Z`);
-  if (Number.isNaN(d.getTime())) return "";
-  return weeklyShifts[WEEKDAYS[d.getUTCDay()]] || "";
-}
 
 export default function ApplyOd() {
   const navigate = useNavigate();

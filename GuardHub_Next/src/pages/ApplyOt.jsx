@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import EmployeePicker from "../components/EmployeePicker";
@@ -8,11 +8,15 @@ import FormActions from "../components/forms/FormActions";
 import DateField from "../components/forms/DateField";
 import { Field, Input, Select, Textarea } from "../components/ui/Field";
 import { useApplyOt } from "../hooks/useOts";
+import { useRosterByEmp } from "../hooks/useRoster";
 import { OT_SHIFTS, OT_DURATIONS } from "../utils/constants";
+import { todayYmd } from "../utils/date";
+import { shiftForDate } from "../utils/roster";
 
 // Apply OT: Search Employee → verify → current/additional shift, duration,
 // location → dates → reason/remarks → submit. Payload matches the OT schema
-// (employeeId Number; name/designation/department derived server-side).
+// (employeeId Number; name/designation/department derived server-side). The
+// current shift is auto-filled from the employee's roster for the OT date.
 const INIT = {
   currentShift: "", additionalShift: "", workingDuration: "",
   fromDate: "", toDate: "", location: "", reason: "", remarks: "",
@@ -26,7 +30,20 @@ export default function ApplyOt() {
   const apply = useApplyOt();
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  // Auto-fill Current Shift from the employee's roster for the OT date. Only a
+  // valid OT shift is locked in; a "WEEK OFF" (or unrostered) day falls back to
+  // the manual picker, since the OT schema only accepts General / A / B / C.
+  const { data: roster, isFetching: rosterLoading } = useRosterByEmp(emp?.empId);
+  const refDate = form.fromDate || todayYmd();
+  const rosteredShift = shiftForDate(roster?.weeklyShifts, refDate);
+  const autoShift = OT_SHIFTS.includes(rosteredShift) ? rosteredShift : "";
+
+  useEffect(() => {
+    if (autoShift) setForm((f) => ({ ...f, currentShift: autoShift }));
+  }, [autoShift]);
+
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
+  const onSelectEmp = (x) => { setEmp(x); setForm((f) => ({ ...f, currentShift: "" })); };
 
   const validate = () => {
     const errs = {};
@@ -70,16 +87,39 @@ export default function ApplyOt() {
         onSubmit={onSubmit}
         aside={
           <FormSection title="Employee Information" description="Search and verify the employee">
-            <EmployeePicker selected={emp} onSelect={setEmp} />
+            <EmployeePicker selected={emp} onSelect={onSelectEmp} />
             {errors.emp && <div className="field__error">{errors.emp}</div>}
             {!emp && <p className="muted text-sm" style={{ margin: "8px 0 0" }}>Select an employee to begin.</p>}
+            {emp && (
+              <p className="muted text-sm" style={{ margin: "8px 0 0" }}>
+                {rosterLoading
+                  ? "Loading roster…"
+                  : rosteredShift
+                  ? `Rostered shift on ${refDate}: ${rosteredShift}`
+                  : "No roster found — set the current shift manually."}
+              </p>
+            )}
           </FormSection>
         }
       >
         <FormSection title="Overtime Details">
           <div className="field-grid-2">
-            <Field label="Current Shift" required error={errors.currentShift}>
-              <Select value={form.currentShift} onChange={set("currentShift")} options={OT_SHIFTS} placeholder="Select shift" />
+            <Field
+              label="Current Shift"
+              required
+              error={errors.currentShift}
+              hint={autoShift ? "Auto-filled from the employee's roster for the OT date" : undefined}
+            >
+              {autoShift ? (
+                <Input value={autoShift} readOnly disabled />
+              ) : (
+                <Select
+                  value={form.currentShift}
+                  onChange={set("currentShift")}
+                  options={OT_SHIFTS}
+                  placeholder={rosterLoading ? "Loading roster…" : "Select shift"}
+                />
+              )}
             </Field>
             <Field label="Additional Shift" required error={errors.additionalShift}>
               <Select value={form.additionalShift} onChange={set("additionalShift")} options={OT_SHIFTS} placeholder="Select shift" />
