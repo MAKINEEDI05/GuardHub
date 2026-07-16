@@ -65,9 +65,14 @@ export default function AttendanceMusterRoll() {
   const exportCsv = () => {
     if (!rows.length) return;
 
+    // Day columns carry the full date (dd/mm/yyyy) so the month/year is explicit
+    // in every column — no separate title row needed.
+    const mm = String(applied.month).padStart(2, "0");
+    const dateHeader = (d) => `${String(d).padStart(2, "0")}/${mm}/${applied.year}`;
+
     const header = [
       "S.No", "Employee ID", "Employee Name",
-      ...dayColumns.map(String),
+      ...dayColumns.map(dateHeader),
       ...SUMMARY_COLS.map((c) => c.label),
     ];
     const body = rows.map((r) => [
@@ -76,32 +81,9 @@ export default function AttendanceMusterRoll() {
       ...SUMMARY_COLS.map((c) => r.summary?.[c.key] ?? 0),
     ]);
 
-    // Title block so the file itself states the month/scope. Each row is padded
-    // to the full column width — otherwise a short first line (no commas) makes
-    // spreadsheets guess the wrong delimiter and split every cell.
-    const width = header.length;
-    const line = (label, value = "") => {
-      const row = new Array(width).fill("");
-      row[0] = label;
-      if (value) row[1] = value;
-      return row;
-    };
-    const scope = [];
-    if (applied.department) scope.push(`Department: ${applied.department}`);
-    if (applied.designation) scope.push(`Designation: ${applied.designation}`);
-    if (applied.shift) scope.push(`Shift: ${applied.shift}`);
-    if (applied.search) scope.push(`Search: ${applied.search}`);
-    const titleBlock = [
-      line("Attendance Muster Roll"),
-      line("Month", `${monthName} ${applied.year}`),
-      ...(scope.length ? [line("Filters", scope.join("  |  "))] : []),
-      line(LEGEND),
-      new Array(width).fill(""),
-    ];
-
     downloadCsvMatrix(
-      `muster-roll-${applied.year}-${String(applied.month).padStart(2, "0")}.csv`,
-      [...titleBlock, header, ...body]
+      `muster-roll-${applied.year}-${mm}.csv`,
+      [header, ...body]
     );
     toast.success(`Exported ${rows.length} employees`);
   };
