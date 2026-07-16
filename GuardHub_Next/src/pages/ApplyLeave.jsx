@@ -122,7 +122,7 @@ export default function ApplyLeave() {
   // NOT a stored leave type — it only ever exists on this one leave.
   const typeOptions = [
     ...types.map((t) => ({ value: t.code, label: `${t.name}${t.isPaid ? "" : " (LOP)"}` })),
-    { value: OTHERS_CODE, label: "Others (custom)" },
+    { value: OTHERS_CODE, label: "Others" },
   ];
 
   return (

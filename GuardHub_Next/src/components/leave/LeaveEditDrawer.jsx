@@ -102,7 +102,7 @@ export default function LeaveEditDrawer({ txn, onClose }) {
               <Select value={form.leaveTypeCode} onChange={set("leaveTypeCode")} placeholder="Select type"
                 options={[
                   ...types.map((t) => ({ value: t.code, label: `${t.name}${t.isPaid ? "" : " (LOP)"}` })),
-                  { value: OTHERS_CODE, label: "Others (custom)" },
+                  { value: OTHERS_CODE, label: "Others" },
                 ]} />
             </Field>
             <Field label="Shift" required error={errors.shiftType}>
