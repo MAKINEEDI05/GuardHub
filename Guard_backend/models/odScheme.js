@@ -43,6 +43,13 @@ const od_scheme = new mongoose.Schema(
       type: String,
       required: true,
     },
+    // Applicable OD days = calendar days in the range MINUS the employee's weekly
+    // off days (computed via utils/workingDays, the same engine Leave uses). This
+    // is the authoritative count stored for reporting.
+    days: {
+      type: Number,
+      default: 0,
+    },
     // Actual location where the OD is performed (replaces the old emergency
     // flag). Older records are backfilled with "Not Specified".
     odLocation: {

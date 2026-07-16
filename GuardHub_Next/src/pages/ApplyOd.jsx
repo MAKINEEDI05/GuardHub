@@ -12,6 +12,8 @@ import { useRosterByEmp } from "../hooks/useRoster";
 import { SHIFT_TYPES, OT_SHIFTS, OT_DURATIONS } from "../utils/constants";
 import { todayYmd } from "../utils/date";
 import { shiftForDate } from "../utils/roster";
+import { computeApplicableDays, weeklyOffIndexesFromRoster } from "../utils/workingDays";
+import WorkingDaysNote from "../components/WorkingDaysNote";
 
 // Apply OD: Search Employee → verify → shift/duration/location/dates → purpose →
 // submit. Mirrors the OT form: the current shift is auto-filled from the
@@ -41,6 +43,14 @@ export default function ApplyOd() {
     if (rosteredShift) setForm((f) => ({ ...f, empShiftType: rosteredShift }));
   }, [rosteredShift]);
 
+  // Applicable OD days: calendar days in the range minus the employee's weekly
+  // offs (same engine Leave uses). Half-day durations count a single day as 0.5.
+  const weeklyOff = weeklyOffIndexesFromRoster(roster?.weeklyShifts);
+  const odCalc = computeApplicableDays(form.empFromDate, form.empToDate, {
+    weeklyOff,
+    halfDay: /half/i.test(form.workingDuration || ""),
+  });
+
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
   const onSelectEmp = (x) => { setEmp(x); setForm((f) => ({ ...f, empShiftType: "" })); };
 
@@ -55,6 +65,10 @@ export default function ApplyOd() {
     else if (form.empToDate < form.empFromDate) errs.empToDate = "To date must be after from date.";
     if (!form.odLocation.trim()) errs.odLocation = "Enter the location.";
     if (!form.empPurpose.trim() || form.empPurpose.trim().length < 5) errs.empPurpose = "Enter a purpose (min 5 chars).";
+    // Block a range that is entirely the employee's weekly off day(s).
+    if (odCalc && odCalc.actualDays <= 0) {
+      errs.dateRange = "All selected dates are weekly off days for this employee — no OD days to apply.";
+    }
     setErrors(errs);
     return Object.keys(errs).length === 0;
   };
@@ -131,6 +145,7 @@ export default function ApplyOd() {
             <DateField label="From Date" required value={form.empFromDate} onChange={set("empFromDate")} error={errors.empFromDate} />
             <DateField label="To Date" required value={form.empToDate} min={form.empFromDate} onChange={set("empToDate")} error={errors.empToDate} />
           </div>
+          <WorkingDaysNote calc={odCalc} noun="OD" error={errors.dateRange} />
         </FormSection>
 
         <FormSection title="Purpose">

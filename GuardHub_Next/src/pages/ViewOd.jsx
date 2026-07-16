@@ -61,6 +61,7 @@ export default function ViewOd() {
     { key: "empShiftType", header: "Current Shift", render: (o) => o.empShiftType || "—" },
     { key: "additionalShift", header: "Additional Shift", render: (o) => o.additionalShift || "—" },
     { key: "workingDuration", header: "Working Duration", render: (o) => o.workingDuration || o.empOdType || "—" },
+    { key: "days", header: "Days", className: "num", render: (o) => (o.days ?? odDays(o.empFromDate, o.empToDate, o.workingDuration || o.empOdType)) ?? "—" },
     { key: "empPurpose", header: "Purpose", render: (o) => <span title={o.empPurpose}>{(o.empPurpose || "—").slice(0, 30)}</span> },
     {
       key: "_actions", header: "Actions", className: "num",
@@ -78,7 +79,9 @@ export default function ViewOd() {
     empId: o.empId, name: o._name, location: o.odLocation,
     from: formatDate(o.empFromDate), to: formatDate(o.empToDate),
     currentShift: o.empShiftType, additionalShift: o.additionalShift,
-    workingDuration: o.workingDuration || o.empOdType, purpose: o.empPurpose,
+    workingDuration: o.workingDuration || o.empOdType,
+    days: o.days ?? odDays(o.empFromDate, o.empToDate, o.workingDuration || o.empOdType),
+    purpose: o.empPurpose,
   }));
 
   return (
@@ -94,7 +97,8 @@ export default function ViewOd() {
                 { key: "empId", label: "Employee ID" }, { key: "name", label: "Name" }, { key: "location", label: "Location" },
                 { key: "from", label: "From" }, { key: "to", label: "To" },
                 { key: "currentShift", label: "Current Shift" }, { key: "additionalShift", label: "Additional Shift" },
-                { key: "workingDuration", label: "Working Duration" }, { key: "purpose", label: "Purpose" },
+                { key: "workingDuration", label: "Working Duration" }, { key: "days", label: "Days" },
+                { key: "purpose", label: "Purpose" },
               ],
               rows: exportRows,
               isFiltered: !!selEmp,
@@ -115,7 +119,7 @@ export default function ViewOd() {
       <Drawer open={!!viewOd} title="OD Details" onClose={() => setViewOd(null)} width={520}>
         {viewOd && (() => {
           const e = empMap.get(String(viewOd.empId)) || {};
-          const days = odDays(viewOd.empFromDate, viewOd.empToDate, viewOd.workingDuration || viewOd.empOdType);
+          const days = viewOd.days ?? odDays(viewOd.empFromDate, viewOd.empToDate, viewOd.workingDuration || viewOd.empOdType);
           return (
             <div className="stack" style={{ gap: 16 }}>
               <section>

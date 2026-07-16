@@ -10,6 +10,7 @@ import { Field, Input, Select, Textarea } from "../components/ui/Field";
 import EmployeeLeaveSummary from "../components/leave/EmployeeLeaveSummary";
 import DeductionBreakdown from "../components/leave/DeductionBreakdown";
 import { useRecordLeave, useLeaveTypes, useLeaveBalances } from "../hooks/useLeaveV2";
+import { useRosterByEmp } from "../hooks/useRoster";
 import { SHIFT_TYPES, DAY_TYPES } from "../utils/constants";
 import {
   computeDeduction,
@@ -17,6 +18,8 @@ import {
   balanceRemaining,
   OTHERS_CODE,
 } from "../utils/leaveDeduction";
+import { computeApplicableDays, weeklyOffIndexesFromRoster } from "../utils/workingDays";
+import WorkingDaysNote from "../components/WorkingDaysNote";
 import { toast } from "../store/toastStore";
 
 // Apply Leave (v2): pick employee → choose type/shift/duration/dates → reason →
@@ -35,14 +38,6 @@ const INIT = {
   customDays: "",
 };
 
-// Client mirror of utils/leaveDays.computeLeaveDays for a live preview only.
-function previewDays(from, to, dayType) {
-  if (!from || !to || to < from) return null;
-  const days = Math.round((new Date(to) - new Date(from)) / 86400000) + 1;
-  if (days === 1 && /HALF/i.test(dayType)) return 0.5;
-  return days;
-}
-
 export default function ApplyLeave() {
   const navigate = useNavigate();
   const [emp, setEmp] = useState(null);
@@ -53,16 +48,27 @@ export default function ApplyLeave() {
 
   const year = new Date().getFullYear();
   const { data: bal } = useLeaveBalances(year, emp?.empId, { enabled: !!emp });
+  const { data: roster } = useRosterByEmp(emp?.empId);
 
   const isOthers = form.leaveTypeCode === OTHERS_CODE;
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
 
-  // Days this leave counts as: the explicit count for Others, else derived.
+  // Applicable-day breakdown: calendar days minus the employee's weekly offs
+  // (from their roster). Others uses the explicit count and is not date-derived.
+  const weeklyOff = weeklyOffIndexesFromRoster(roster?.weeklyShifts);
+  const leaveCalc = isOthers
+    ? null
+    : computeApplicableDays(form.fromDate, form.toDate, {
+        weeklyOff,
+        halfDay: /HALF/i.test(form.dayType),
+      });
+
+  // Days this leave counts as: the explicit count for Others, else applicable days.
   const days = isOthers
     ? (form.customDays === "" ? null : Number(form.customDays))
-    : previewDays(form.fromDate, form.toDate, form.dayType);
+    : (leaveCalc ? leaveCalc.actualDays : null);
 
   // Live CL → Comp Off split against the employee's current balance (non-Others).
   const clRem = balanceRemaining(bal, "CL");
@@ -85,8 +91,12 @@ export default function ApplyLeave() {
       if (!nameCheck.ok) errs.customLeaveName = nameCheck.message;
       const d = Number(form.customDays);
       if (!form.customDays || Number.isNaN(d) || d <= 0) errs.customDays = "Enter days greater than 0.";
-    } else if (!form.dayType) {
-      errs.dayType = "Required";
+    } else {
+      if (!form.dayType) errs.dayType = "Required";
+      // Block a range that is entirely the employee's weekly off day(s).
+      if (leaveCalc && leaveCalc.actualDays <= 0) {
+        errs.dateRange = "All selected dates are weekly off days for this employee — no leave days to apply.";
+      }
     }
 
     setErrors(errs);
@@ -181,12 +191,15 @@ export default function ApplyLeave() {
             <DateField label="From Date" required value={form.fromDate} onChange={set("fromDate")} error={errors.fromDate} />
             <DateField label="To Date" required value={form.toDate} min={form.fromDate} onChange={set("toDate")} error={errors.toDate} />
           </div>
-          {days != null && days > 0 && (
-            <p className="text-sm muted" style={{ margin: "4px 0 0" }}>
-              This leave counts as <strong>{days}</strong> day(s).
-              {isOthers && " Others leaves do not affect any leave balance."}
-            </p>
-          )}
+          {isOthers
+            ? days != null && days > 0 && (
+                <p className="text-sm muted" style={{ margin: "4px 0 0" }}>
+                  This leave counts as <strong>{days}</strong> day(s). Others leaves do not affect any leave balance.
+                </p>
+              )
+            : (
+                <WorkingDaysNote calc={leaveCalc} noun="leave" error={errors.dateRange} />
+              )}
         </FormSection>
 
         {/* Deduction Breakdown — how the days are funded (CL → Comp Off). Updates

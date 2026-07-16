@@ -1,8 +1,12 @@
 const LeaveTransaction = require("../models/leaveTransactionScheme");
 const LeaveType = require("../models/leaveTypeScheme");
 const Leave = require("../models/leaveScheme"); // legacy leave_mgmt (compat)
+const Roster = require("../models/rosterScheme");
 const { resolveActiveEmployee, getActiveEmployeeIds } = require("../utils/employeeRef");
-const { computeLeaveDays } = require("../utils/leaveDays");
+const {
+  computeApplicableDays,
+  weeklyOffIndexesFromRoster,
+} = require("../utils/workingDays");
 const {
   computeDeduction,
   validateCustomLeaveName,
@@ -15,6 +19,17 @@ const {
   adjustBalanceUsed,
   getClCompRemaining,
 } = require("./leaveBalanceController");
+
+// The employee's weekly-off weekday indexes (from their roster). Excluded from
+// every leave/OD day count so a range that spans a week-off charges fewer days.
+async function weeklyOffForEmp(empId) {
+  const roster = await Roster.findOne({ empId: String(empId) }).lean();
+  return weeklyOffIndexesFromRoster(roster?.weeklyShifts);
+}
+
+// Message shown when a range collapses to zero applicable days (all weekly off).
+const ALL_WEEKOFF_MSG =
+  "The selected dates fall entirely on the employee's weekly off day(s) — there are no leave days to apply.";
 
 // Debit CL then Comp Off for one leave's split (seeding CL's allocation from its
 // default quota on first touch so a fresh balance row still reflects the real
@@ -82,10 +97,16 @@ const recordLeave = async (req, res) => {
     } else {
       const type = await LeaveType.findOne({ code: String(leaveTypeCode).toUpperCase(), active: true });
       if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
-      days = computeLeaveDays(fromDate, toDate, dayType);
-      if (days === null || days <= 0) {
+      // Applicable days = calendar days minus the employee's weekly offs.
+      const weeklyOff = await weeklyOffForEmp(empIdNum);
+      const calc = computeApplicableDays(fromDate, toDate, { weeklyOff, halfDay: /HALF/i.test(dayType) });
+      if (!calc) {
         return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
       }
+      if (calc.actualDays <= 0) {
+        return res.status(400).json({ message: ALL_WEEKOFF_MSG });
+      }
+      days = calc.actualDays;
       leaveTypeName = type.name;
       isPaid = type.isPaid;
       // Fund CL first, then Comp Off, against the live remaining (same source as
@@ -225,10 +246,15 @@ const updateLeave = async (req, res) => {
     } else {
       const type = await LeaveType.findOne({ code: nextCode, active: true });
       if (!type) return res.status(400).json({ message: "Unknown or inactive leave type" });
-      days = computeLeaveDays(fromRaw, toRaw, dayType);
-      if (days === null || days <= 0) {
+      const weeklyOff = await weeklyOffForEmp(txn.empId);
+      const calc = computeApplicableDays(fromRaw, toRaw, { weeklyOff, halfDay: /HALF/i.test(dayType) });
+      if (!calc) {
         return res.status(400).json({ message: "Invalid date range (toDate must be on/after fromDate)" });
       }
+      if (calc.actualDays <= 0) {
+        return res.status(400).json({ message: ALL_WEEKOFF_MSG });
+      }
+      days = calc.actualDays;
       leaveTypeName = type.name;
       isPaid = type.isPaid;
     }
