@@ -65,20 +65,6 @@ export default function AttendanceMusterRoll() {
   const exportCsv = () => {
     if (!rows.length) return;
 
-    // Title block so the file itself states the month/scope (not just the name).
-    const scope = [];
-    if (applied.department) scope.push(`Department: ${applied.department}`);
-    if (applied.designation) scope.push(`Designation: ${applied.designation}`);
-    if (applied.shift) scope.push(`Shift: ${applied.shift}`);
-    if (applied.search) scope.push(`Search: ${applied.search}`);
-    const titleBlock = [
-      ["Attendance Muster Roll"],
-      [`Month: ${monthName} ${applied.year}`],
-      ...(scope.length ? [[scope.join("  |  ")]] : []),
-      [LEGEND],
-      [],
-    ];
-
     const header = [
       "S.No", "Employee ID", "Employee Name",
       ...dayColumns.map(String),
@@ -89,6 +75,30 @@ export default function AttendanceMusterRoll() {
       ...dayColumns.map((d) => r.days?.[d] || ""),
       ...SUMMARY_COLS.map((c) => r.summary?.[c.key] ?? 0),
     ]);
+
+    // Title block so the file itself states the month/scope. Each row is padded
+    // to the full column width — otherwise a short first line (no commas) makes
+    // spreadsheets guess the wrong delimiter and split every cell.
+    const width = header.length;
+    const line = (label, value = "") => {
+      const row = new Array(width).fill("");
+      row[0] = label;
+      if (value) row[1] = value;
+      return row;
+    };
+    const scope = [];
+    if (applied.department) scope.push(`Department: ${applied.department}`);
+    if (applied.designation) scope.push(`Designation: ${applied.designation}`);
+    if (applied.shift) scope.push(`Shift: ${applied.shift}`);
+    if (applied.search) scope.push(`Search: ${applied.search}`);
+    const titleBlock = [
+      line("Attendance Muster Roll"),
+      line("Month", `${monthName} ${applied.year}`),
+      ...(scope.length ? [line("Filters", scope.join("  |  "))] : []),
+      line(LEGEND),
+      new Array(width).fill(""),
+    ];
+
     downloadCsvMatrix(
       `muster-roll-${applied.year}-${String(applied.month).padStart(2, "0")}.csv`,
       [...titleBlock, header, ...body]
