@@ -222,9 +222,9 @@ export default function MonthWiseReport() {
         {dateError && <div className="field__error mt-2">{dateError}</div>}
       </Card>
 
-      {/* Summary cards */}
+      {/* Summary cards — single row (scrolls horizontally if space is tight) */}
       {!dateError && (
-        <div className="summary-grid mb-4">
+        <div className="summary-grid summary-grid--row mb-4">
           {SUMMARY.map((s) => (
             <div className="summary-tile" key={s.key}>
               <div className="summary-tile__value">{counts[s.key] ?? 0}</div>

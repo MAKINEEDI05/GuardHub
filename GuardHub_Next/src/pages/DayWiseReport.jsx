@@ -169,8 +169,8 @@ export default function DayWiseReport() {
         </div>
       </Card>
 
-      {/* Summary cards */}
-      <div className="summary-grid mb-4">
+      {/* Summary cards — single row (scrolls horizontally if space is tight) */}
+      <div className="summary-grid summary-grid--row mb-4">
         {SUMMARY.map((s) => (
           <div className="summary-tile" key={s.key}>
             <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
