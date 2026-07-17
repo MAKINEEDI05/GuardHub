@@ -7,7 +7,12 @@ import Icon from "../components/ui/Icon";
 import Drawer from "../components/ui/Drawer";
 import ConfirmDialog from "../components/ui/ConfirmDialog";
 import { Field, Input, Textarea, Select } from "../components/ui/Field";
-import { useLeaveTypes, useSaveLeaveType, useDeleteLeaveType } from "../hooks/useLeaveV2";
+import {
+  useLeaveTypes,
+  useSaveLeaveType,
+  useDeleteLeaveType,
+  useResetLeaveBalances,
+} from "../hooks/useLeaveV2";
 
 const INIT = { code: "", name: "", defaultAnnualQuota: 0, isPaid: "true", sortOrder: 0, description: "" };
 
@@ -23,6 +28,9 @@ export default function LeaveTypes() {
   const { data: types = [], isLoading } = useLeaveTypes(false);
   const save = useSaveLeaveType();
   const del = useDeleteLeaveType();
+  const reset = useResetLeaveBalances();
+  const [confirmReset, setConfirmReset] = useState(false);
+  const year = new Date().getFullYear();
 
   // Removed (inactive) types drop out of the list; the mandatory buckets always
   // stay visible even if inactive.
@@ -99,7 +107,14 @@ export default function LeaveTypes() {
       <PageHeader
         title="Leave Types"
         subtitle="Configurable leave categories used across allocation, apply and reports"
-        actions={<Button variant="primary" onClick={openNew}><Icon name="plus" size={16} /> New Type</Button>}
+        actions={
+          <>
+            <Button variant="outline" onClick={() => setConfirmReset(true)}>
+              <Icon name="calendar-month" size={16} /> Academic Reset
+            </Button>
+            <Button variant="primary" onClick={openNew}><Icon name="plus" size={16} /> New Type</Button>
+          </>
+        }
       />
 
       <DataTable columns={columns} rows={rows} loading={isLoading} pageSize={15} emptyTitle="No leave types" emptyIcon="🗂️" rowKey={(t) => t._id} />
@@ -136,6 +151,22 @@ export default function LeaveTypes() {
           <Textarea rows={2} value={form.description} onChange={set("description")} />
         </Field>
       </Drawer>
+
+      <ConfirmDialog
+        open={confirmReset}
+        title={`Start a new leave cycle for ${year}?`}
+        message={
+          `Every active employee's leave is reset to a fresh quota for ${year} and their used days go back to 0. ` +
+          `Unused Comp Off is CARRIED FORWARD — it is not wiped. ` +
+          `Leave history is kept; only the balances are reset. This cannot be undone.`
+        }
+        confirmLabel="Reset leaves"
+        loading={reset.isPending}
+        onCancel={() => setConfirmReset(false)}
+        onConfirm={async () => {
+          try { await reset.mutateAsync(year); } finally { setConfirmReset(false); }
+        }}
+      />
 
       <ConfirmDialog
         open={!!confirm}

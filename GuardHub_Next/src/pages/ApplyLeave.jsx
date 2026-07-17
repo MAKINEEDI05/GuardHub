@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import PageHeader from "../components/ui/PageHeader";
 import EmployeePicker from "../components/EmployeePicker";
@@ -19,6 +19,8 @@ import {
   OTHERS_CODE,
 } from "../utils/leaveDeduction";
 import { computeApplicableDays, weeklyOffIndexesFromRoster } from "../utils/workingDays";
+import { shiftForDate } from "../utils/roster";
+import { todayYmd } from "../utils/date";
 import WorkingDaysNote from "../components/WorkingDaysNote";
 import { toast } from "../store/toastStore";
 
@@ -54,6 +56,13 @@ export default function ApplyLeave() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
   const reset = () => { setForm(INIT); setEmp(null); setErrors({}); };
+
+  // Shift is the employee's rostered shift for the leave date — derived, not
+  // chosen (same rule as Apply OD / Apply OT).
+  const rosteredShift = shiftForDate(roster?.weeklyShifts, form.fromDate || todayYmd());
+  useEffect(() => {
+    if (rosteredShift) setForm((f) => ({ ...f, shiftType: rosteredShift }));
+  }, [rosteredShift]);
 
   // Applicable-day breakdown: calendar days minus the employee's weekly offs
   // (from their roster). Others uses the explicit count and is not date-derived.
@@ -142,7 +151,7 @@ export default function ApplyLeave() {
         onSubmit={onSubmit}
         aside={
           <FormSection title="Employee Information" description="Search and verify the employee">
-            <EmployeePicker selected={emp} onSelect={(x) => setEmp(x)} />
+            <EmployeePicker selected={emp} onSelect={(x) => { setEmp(x); setForm((f) => ({ ...f, shiftType: "" })); }} />
             {errors.emp && <div className="field__error">{errors.emp}</div>}
             {!emp && <p className="muted text-sm" style={{ margin: "8px 0 0" }}>Select an employee to begin.</p>}
             {emp && (
@@ -162,8 +171,17 @@ export default function ApplyLeave() {
               <Select value={form.leaveTypeCode} onChange={set("leaveTypeCode")}
                 placeholder="Select type" options={typeOptions} />
             </Field>
-            <Field label="Shift Type" required error={errors.shiftType}>
-              <Select value={form.shiftType} onChange={set("shiftType")} options={SHIFT_TYPES} placeholder="Select shift" />
+            <Field
+              label="Shift Type"
+              required
+              error={errors.shiftType}
+              hint={rosteredShift ? "Auto-filled from the employee's roster for the leave date" : undefined}
+            >
+              {rosteredShift ? (
+                <Input value={rosteredShift} readOnly disabled />
+              ) : (
+                <Select value={form.shiftType} onChange={set("shiftType")} options={SHIFT_TYPES} placeholder="Select shift" />
+              )}
             </Field>
 
             {/* Others: hide the predefined-duration behaviour; capture a custom

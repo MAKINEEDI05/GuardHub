@@ -29,6 +29,7 @@ export const ENDPOINTS = {
   leaveType: (id) => `/leave/types/${id}`, // PUT / DELETE(deactivate)
   leaveBalances: "/leave/balances", // ?year&empId
   leaveAllocate: "/leave/balances/allocate", // POST { year, allocations[], empIds? }
+  leaveReset: "/leave/balances/reset", // POST { year? } — academic reset (Comp Off carries forward)
   leaveTransactions: "/leave/transactions", // GET(filters) / POST record
   leaveTransaction: (id) => `/leave/transactions/${id}`, // PUT edit / DELETE
   leaveManage: "/leave/manage", // unified filtered summary (search/dept/desig/year/month/date/type)

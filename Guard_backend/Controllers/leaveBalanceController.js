@@ -279,9 +279,71 @@ const allocateBalances = async (req, res) => {
   }
 };
 
+// POST /leave/balances/reset  { year? }
+// ACADEMIC RESET — start a fresh leave cycle for every active employee:
+// each leave type goes back to its full default quota with `used` cleared.
+//
+// Comp Off is deliberately NOT touched. Its allocation is DERIVED from the
+// employee's OT (earned = sum of OT days), so remaining = earned - used.
+// Clearing its `used` would hand back Comp Off the employee has already spent;
+// leaving it alone means the UNUSED balance carries forward exactly (earned 10,
+// used 6 -> 4 still available after the reset).
+//
+// Leave history (transactions) is never deleted — only the balances reset.
+const resetBalances = async (req, res) => {
+  try {
+    const year = parseInt(req.body.year, 10) || new Date().getFullYear();
+    const [{ numbers: activeIds }, types] = await Promise.all([
+      getActiveEmployeeIds(),
+      LeaveType.find({ active: true }).lean(),
+    ]);
+    if (!activeIds.length) {
+      return res.status(400).json({ message: "No active employees to reset" });
+    }
+
+    // Fresh quota + zero usage for every type EXCEPT Comp Off (carried forward).
+    const set = {};
+    types.forEach((t) => {
+      if (t.code === COMP_CODE) return;
+      set[`types.${t.code}.allocated`] = Math.max(0, Number(t.defaultAnnualQuota) || 0);
+      set[`types.${t.code}.used`] = 0;
+    });
+    if (!Object.keys(set).length) {
+      return res.status(400).json({ message: "No resettable leave types found" });
+    }
+
+    // Comp Off carried forward, reported back so the UI can confirm what was kept.
+    const compMap = await compOffEarnedMap(year, activeIds);
+    const balMap = await getBalanceMap(year, activeIds);
+    let compCarried = 0;
+    activeIds.forEach((empId) => {
+      const earned = compMap.get(empId) || 0;
+      const used = bucket(balMap.get(empId), COMP_CODE).used || 0;
+      compCarried += Math.max(0, earned - used);
+    });
+
+    const ops = activeIds.map((empId) => ({
+      updateOne: { filter: { empId, year }, update: { $set: set }, upsert: true },
+    }));
+    await LeaveBalance.bulkWrite(ops, { ordered: false });
+
+    return res.status(200).json({
+      message: "Academic reset complete",
+      year,
+      employees: activeIds.length,
+      typesReset: Object.keys(set).length / 2,
+      compOffCarriedForward: Math.round(compCarried * 100) / 100,
+    });
+  } catch (error) {
+    console.error("Error resetting balances:", error);
+    return res.status(500).json({ message: "Failed to reset leave balances" });
+  }
+};
+
 module.exports = {
   getBalances,
   allocateBalances,
+  resetBalances,
   adjustBalanceUsed,
   buildYearRows,
   getBalanceMap,

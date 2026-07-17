@@ -187,11 +187,6 @@ export default function LeaveManagement() {
                     {draft.searchEmp.empDepartment ? ` · ${draft.searchEmp.empDepartment}` : ""}
                   </span>
                 </span>
-                <button type="button" className="lm-chip__clear"
-                  aria-label="Clear selected employee"
-                  onClick={() => setDraft((d) => ({ ...d, searchEmp: null, empId: "", department: "", designation: "" }))}>
-                  × Clear
-                </button>
               </div>
             )}
           </div>

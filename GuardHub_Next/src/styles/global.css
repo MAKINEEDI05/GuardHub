@@ -801,6 +801,21 @@ h1, h2, h3, h4, h5 {
 .summary-tile__value { font-size: 1.5rem; font-weight: 700; }
 .summary-tile__label { font-size: var(--fs-small); color: var(--text-muted); margin-top: 2px; }
 
+/* One-line variant: keeps every tile on a SINGLE row sharing the width equally
+   (used by the report headers, which have many tiles). On narrow screens the
+   strip scrolls horizontally instead of wrapping to a second row. */
+.summary-grid--row {
+  grid-template-columns: none;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(84px, 1fr);
+  gap: var(--sp-2);
+  overflow-x: auto;
+  padding-bottom: 2px;
+}
+.summary-grid--row .summary-tile { padding: var(--sp-3) var(--sp-2); }
+.summary-grid--row .summary-tile__value { font-size: 1.25rem; }
+.summary-grid--row .summary-tile__label { white-space: nowrap; }
+
 /* Mobile */
 .hamburger { display: none; }
 @media (max-width: 900px) {

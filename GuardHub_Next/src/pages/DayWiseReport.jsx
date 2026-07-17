@@ -12,7 +12,10 @@ import { ErrorState, EmptyState } from "../components/ui/States";
 import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useAttendanceByDate } from "../hooks/useReports";
 import { useEmployees } from "../hooks/useEmployees";
+import { useRosters } from "../hooks/useRoster";
+import { shiftForDate } from "../utils/roster";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
+import { shiftBucket } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date —
@@ -30,16 +33,31 @@ const CSV_COLUMNS = [
   { key: "empDate", label: "Date" },
 ];
 
-// Summary cards shown above the table (counts derived from the day's records).
+// Summary cards shown above the table, in one row.
+//   Total     = active employees (the employee master, NOT the attendance rows)
+//   Week Off  = employees whose ROSTER marks that weekday as a week off
+//   A/B/C/Gen = "present / rostered" for that shift on the date (e.g. 1/2) — the
+//               denominator comes from the roster, so it is meaningful even
+//               before the day's attendance has been processed
+//   the rest  = statuses from the processed attendance rows
 const SUMMARY = [
-  { key: "total", label: "Total", match: () => true },
-  { key: "present", label: "Present", match: (v) => v.includes("present") },
-  { key: "absent", label: "Absent", match: (v) => v.includes("absent") },
-  { key: "weekoff", label: "Week Off", match: (v) => v.includes("week") && v.includes("off") },
-  { key: "leave", label: "Leave", match: (v) => v.includes("leave") },
-  { key: "od", label: "OD", match: (v) => v === "od" || v.includes(" od") },
-  { key: "ot", label: "OT", match: (v) => v === "ot" || v.includes("overtime") },
+  { key: "total", label: "Total" },
+  { key: "present", label: "Present" },
+  { key: "absent", label: "Absent" },
+  { key: "weekoff", label: "Week Off" },
+  { key: "shiftA", label: "A Shift", ratio: true },
+  { key: "shiftB", label: "B Shift", ratio: true },
+  { key: "shiftC", label: "C Shift", ratio: true },
+  { key: "general", label: "General", ratio: true },
+  { key: "leave", label: "Leave" },
+  { key: "od", label: "OD" },
+  { key: "ot", label: "OT" },
 ];
+// shift bucket -> summary key
+const SHIFT_KEY = { "A Shift": "shiftA", "B Shift": "shiftB", "C Shift": "shiftC", General: "general" };
+// Employees with no roster (or no shift for that weekday) — surfaced so the
+// cards always add up to Total instead of quietly losing people.
+const NOT_ROSTERED = "Not Rostered";
 
 export default function DayWiseReport() {
   // `?q=` pre-fills the search — used by the Month Wise Report "View daily
@@ -63,6 +81,14 @@ export default function DayWiseReport() {
     [employees]
   );
 
+  // Rosters drive the Week Off count and the shift denominators (empId is a
+  // String in roster_mgmt).
+  const { data: rosters = [] } = useRosters();
+  const rosterMap = useMemo(
+    () => new Map(rosters.map((r) => [String(r.empId), r])),
+    [rosters]
+  );
+
   const filtered = useMemo(() => {
     const q = term.trim().toLowerCase();
     if (!q) return rows;
@@ -73,17 +99,52 @@ export default function DayWiseReport() {
     );
   }, [rows, term]);
 
-  const counts = useMemo(() => {
-    const out = {};
-    SUMMARY.forEach((s) => (out[s.key] = 0));
+  // Status counts + shift-wise headcount for the day. Shifts are bucketed via
+  // shiftBucket so roster variants ("A Shift" / "1-General" / ...) all land right.
+  const { counts, shiftStats, extraShifts } = useMemo(() => {
+    const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
+    // shift key -> { present, total } headcount for the day
+    const stats = Object.fromEntries(Object.values(SHIFT_KEY).map((k) => [k, { present: 0, total: 0 }]));
+    const other = new Map(); // unrecognised roster labels -> their own cards
+
+    // 1. Statuses come from the processed attendance rows; remember WHO was present.
+    const presentIds = new Set();
     rows.forEach((r) => {
       const v = String(r.empAction ?? "").toLowerCase();
-      SUMMARY.forEach((s) => {
-        if (s.key === "total" || s.match(v)) out[s.key] += 1;
-      });
+      if (v.includes("present")) { out.present += 1; presentIds.add(String(r.empId)); }
+      if (v.includes("leave")) out.leave += 1;
+      if (v === "od" || v.includes(" od")) out.od += 1;
+      if (v === "ot" || v.includes("overtime")) out.ot += 1;
     });
-    return out;
-  }, [rows]);
+
+    // 2. Headcount + shift split come from the employee master and the roster for
+    //    this date, so they hold up even if attendance isn't processed yet.
+    out.total = employees.length;
+    employees.forEach((e) => {
+      const roster = rosterMap.get(String(e.empId));
+      const bucket = shiftBucket(shiftForDate(roster?.weeklyShifts, date));
+      if (bucket === "WEEK OFF") { out.weekoff += 1; return; }
+      // No roster (or no shift set for that weekday) gets its own bucket rather
+      // than being dropped — so the cards always reconcile with Total.
+      const label = bucket || NOT_ROSTERED;
+      const key = SHIFT_KEY[label];
+      const target = key ? stats[key] : other.get(label) || { present: 0, total: 0 };
+      target.total += 1;
+      if (presentIds.has(String(e.empId))) target.present += 1;
+      if (!key) other.set(label, target);
+    });
+
+    // 3. Absent is DERIVED, exactly like the Month-Wise report
+    //    (absent = total - present - leave - od - weekOff), so the two reports
+    //    can never disagree. Anyone not accounted for on a working day is absent.
+    out.absent = Math.max(0, out.total - out.present - out.leave - out.od - out.weekoff);
+
+    return {
+      counts: out,
+      shiftStats: stats,
+      extraShifts: [...other.entries()].sort((a, b) => b[1].total - a[1].total),
+    };
+  }, [rows, employees, rosterMap, date]);
 
   const columns = [
     {
@@ -151,12 +212,23 @@ export default function DayWiseReport() {
         </div>
       </Card>
 
-      {/* Summary cards */}
-      <div className="summary-grid mb-4">
+      {/* Summary cards — single row (scrolls horizontally if space is tight) */}
+      <div className="summary-grid summary-grid--row mb-4">
         {SUMMARY.map((s) => (
           <div className="summary-tile" key={s.key}>
-            <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
+            <div className="summary-tile__value">
+              {s.ratio
+                ? `${shiftStats[s.key].present}/${shiftStats[s.key].total}`
+                : counts[s.key] ?? 0}
+            </div>
             <div className="summary-tile__label">{s.label}</div>
+          </div>
+        ))}
+        {/* Shift labels outside General/A/B/C — surfaced, never dropped */}
+        {extraShifts.map(([label, v]) => (
+          <div className="summary-tile" key={label}>
+            <div className="summary-tile__value">{`${v.present}/${v.total}`}</div>
+            <div className="summary-tile__label">{label}</div>
           </div>
         ))}
       </div>

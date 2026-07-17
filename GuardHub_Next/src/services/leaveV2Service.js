@@ -38,6 +38,12 @@ export const leaveBalanceService = {
     const { data } = await apiClient.post(ENDPOINTS.leaveAllocate, payload);
     return data;
   },
+  // Academic reset: every leave type back to its full quota for the year.
+  // Comp Off is carried forward (its unused balance is preserved server-side).
+  async reset(year) {
+    const { data } = await apiClient.post(ENDPOINTS.leaveReset, { year });
+    return data;
+  },
 };
 
 export const leaveTxnService = {

@@ -37,6 +37,18 @@ const CSV_COLUMNS = [
   { key: "totalDays", label: "Total Days" },
 ];
 
+// Summary cards above the table. Total = employees; the rest are day totals over
+// the selected range.
+const SUMMARY = [
+  { key: "total", label: "Total" },
+  { key: "present", label: "Present" },
+  { key: "absent", label: "Absent" },
+  { key: "weekoff", label: "Week Off" },
+  { key: "leave", label: "Leave" },
+  { key: "od", label: "OD" },
+  { key: "ot", label: "OT" },
+];
+
 // Numeric attendance columns rendered as right-aligned, sortable cells.
 const COUNT_COLS = [
   { key: "presentDays", header: "Present" },
@@ -81,6 +93,24 @@ export default function MonthWiseReport() {
         .some((v) => v.includes(q))
     );
   }, [rows, term]);
+
+  // Cards over the FILTERED rows: Total = employees; attendance figures are day
+  // totals; shift figures are days rostered to each shift (rosters rotate by
+  // weekday, so one employee contributes days to several shifts).
+  // Cards over the FILTERED rows: Total = employees, the rest are day totals.
+  const counts = useMemo(() => {
+    const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
+    out.total = filtered.length;
+    filtered.forEach((r) => {
+      out.present += r.presentDays || 0;
+      out.absent += r.absentDays || 0;
+      out.weekoff += r.weekOffDays || 0;
+      out.leave += r.leaveDays || 0;
+      out.od += r.odDays || 0;
+      out.ot += r.otDays || 0;
+    });
+    return out;
+  }, [filtered]);
 
   const exportCsv = () => {
     if (!filtered.length) return;
@@ -178,6 +208,18 @@ export default function MonthWiseReport() {
         </div>
         {dateError && <div className="field__error mt-2">{dateError}</div>}
       </Card>
+
+      {/* Summary cards — single row (scrolls horizontally if space is tight) */}
+      {!dateError && (
+        <div className="summary-grid summary-grid--row mb-4">
+          {SUMMARY.map((s) => (
+            <div className="summary-tile" key={s.key}>
+              <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
+              <div className="summary-tile__label">{s.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
 
       {dateError ? (
         <Card>
