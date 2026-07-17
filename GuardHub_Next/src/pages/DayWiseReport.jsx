@@ -12,6 +12,8 @@ import { ErrorState, EmptyState } from "../components/ui/States";
 import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useAttendanceByDate } from "../hooks/useReports";
 import { useEmployees } from "../hooks/useEmployees";
+import { useRosters } from "../hooks/useRoster";
+import { shiftForDate } from "../utils/roster";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
 import { shiftBucket } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
@@ -31,9 +33,13 @@ const CSV_COLUMNS = [
   { key: "empDate", label: "Date" },
 ];
 
-// Summary cards shown above the table, in one row. The shift cards are a RATIO —
-// "present / rostered" for that shift today (e.g. 1/2) — i.e. how many of the
-// people on that shift actually turned up.
+// Summary cards shown above the table, in one row.
+//   Total     = active employees (the employee master, NOT the attendance rows)
+//   Week Off  = employees whose ROSTER marks that weekday as a week off
+//   A/B/C/Gen = "present / rostered" for that shift on the date (e.g. 1/2) — the
+//               denominator comes from the roster, so it is meaningful even
+//               before the day's attendance has been processed
+//   the rest  = statuses from the processed attendance rows
 const SUMMARY = [
   { key: "total", label: "Total" },
   { key: "present", label: "Present" },
@@ -72,6 +78,14 @@ export default function DayWiseReport() {
     [employees]
   );
 
+  // Rosters drive the Week Off count and the shift denominators (empId is a
+  // String in roster_mgmt).
+  const { data: rosters = [] } = useRosters();
+  const rosterMap = useMemo(
+    () => new Map(rosters.map((r) => [String(r.empId), r])),
+    [rosters]
+  );
+
   const filtered = useMemo(() => {
     const q = term.trim().toLowerCase();
     if (!q) return rows;
@@ -88,26 +102,32 @@ export default function DayWiseReport() {
     const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
     // shift key -> { present, total } headcount for the day
     const stats = Object.fromEntries(Object.values(SHIFT_KEY).map((k) => [k, { present: 0, total: 0 }]));
-    const other = new Map(); // unrecognised shift labels -> their own cards
+    const other = new Map(); // unrecognised roster labels -> their own cards
 
+    // 1. Statuses come from the processed attendance rows; remember WHO was present.
+    const presentIds = new Set();
     rows.forEach((r) => {
       const v = String(r.empAction ?? "").toLowerCase();
-      const isPresent = v.includes("present");
-      out.total += 1;
-      if (isPresent) out.present += 1;
+      if (v.includes("present")) { out.present += 1; presentIds.add(String(r.empId)); }
       if (v.includes("absent")) out.absent += 1;
-      if (v.includes("week") && v.includes("off")) out.weekoff += 1;
       if (v.includes("leave")) out.leave += 1;
       if (v === "od" || v.includes(" od")) out.od += 1;
       if (v === "ot" || v.includes("overtime")) out.ot += 1;
+    });
 
-      const bucket = shiftBucket(r.empShift);
-      if (bucket === "WEEK OFF" || bucket === "") return; // Week Off has its own card
+    // 2. Headcount + shift split come from the employee master and the roster for
+    //    this date, so they hold up even if attendance isn't processed yet.
+    out.total = employees.length;
+    employees.forEach((e) => {
+      const roster = rosterMap.get(String(e.empId));
+      const bucket = shiftBucket(shiftForDate(roster?.weeklyShifts, date));
+      if (bucket === "WEEK OFF") { out.weekoff += 1; return; }
+      if (!bucket) return; // employee has no roster for that weekday
       const key = SHIFT_KEY[bucket];
-      const target = key ? stats[key] : other.get(r.empShift) || { present: 0, total: 0 };
+      const target = key ? stats[key] : other.get(bucket) || { present: 0, total: 0 };
       target.total += 1;
-      if (isPresent) target.present += 1;
-      if (!key) other.set(r.empShift, target);
+      if (presentIds.has(String(e.empId))) target.present += 1;
+      if (!key) other.set(bucket, target);
     });
 
     return {
@@ -115,7 +135,7 @@ export default function DayWiseReport() {
       shiftStats: stats,
       extraShifts: [...other.entries()].sort((a, b) => b[1].total - a[1].total),
     };
-  }, [rows]);
+  }, [rows, employees, rosterMap, date]);
 
   const columns = [
     {
