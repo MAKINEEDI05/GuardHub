@@ -315,10 +315,12 @@ const getMonthwiseSummary = async (req, res) => {
           },
         },
       },
-      { $group: { _id: "$_id.code", presentDays: { $sum: 1 } } },
+      // Keep the actual days (not just a count) so present can also be split by
+      // the shift the employee was rostered to on each of those days.
+      { $group: { _id: "$_id.code", days: { $addToSet: "$_id.day" } } },
     ]);
     const presentMap = new Map(
-      presentAgg.map((p) => [String(p._id), p.presentDays])
+      presentAgg.map((p) => [String(p._id), new Set(p.days)])
     );
 
     // ---- Leave / OD / OT: covered-day Set per employee, one find each --------
@@ -392,6 +394,23 @@ const getMonthwiseSummary = async (req, res) => {
       return out;
     };
 
+    // Days in the range the employee was PRESENT, split by the shift they were
+    // rostered to on each of those days — the numerator for the shift cards
+    // ("present / rostered", e.g. 1/2).
+    const presentShiftDaysFor = (code) => {
+      const roster = rosterMap.get(code);
+      const dates = presentMap.get(code);
+      const out = {};
+      if (!dates || !roster || !roster.weeklyShifts) return out;
+      for (const key of dates) {
+        const dow = new Date(`${key}T00:00:00.000Z`).getUTCDay();
+        const s = String(roster.weeklyShifts[WEEKDAYS[dow]] || "").trim();
+        if (!s) continue;
+        out[s] = (out[s] || 0) + 1;
+      }
+      return out;
+    };
+
     // Count covered dates whose weekday is NOT one of the employee's weekly offs.
     const countWorkingCovered = (set, offSet) => {
       if (!set) return 0;
@@ -406,7 +425,7 @@ const getMonthwiseSummary = async (req, res) => {
     let rows = employees.map((e) => {
       const code = String(e.empId);
       const offSet = weekOffWeekdaysFor(code);
-      const presentDays = presentMap.get(code) || 0;
+      const presentDays = presentMap.get(code)?.size || 0;
       const leaveDays = countWorkingCovered(leaveMap.get(e.empId), offSet);
       const odDays = countWorkingCovered(odMap.get(e.empId), offSet);
       const otDays = otMap.get(e.empId)?.size || 0;
@@ -429,6 +448,7 @@ const getMonthwiseSummary = async (req, res) => {
         weekOffDays,
         totalDays,
         shiftDays: shiftDaysFor(code),
+        presentShiftDays: presentShiftDaysFor(code),
       };
     });
 

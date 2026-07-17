@@ -31,21 +31,24 @@ const CSV_COLUMNS = [
   { key: "empDate", label: "Date" },
 ];
 
-// Summary cards shown above the table: attendance status counts plus the
-// shift-wise headcount for the day, in one row.
+// Summary cards shown above the table, in one row. The shift cards are a RATIO —
+// "present / rostered" for that shift today (e.g. 1/2) — i.e. how many of the
+// people on that shift actually turned up.
 const SUMMARY = [
   { key: "total", label: "Total" },
   { key: "present", label: "Present" },
   { key: "absent", label: "Absent" },
   { key: "weekoff", label: "Week Off" },
-  { key: "shiftA", label: "A Shift" },
-  { key: "shiftB", label: "B Shift" },
-  { key: "shiftC", label: "C Shift" },
-  { key: "general", label: "General" },
+  { key: "shiftA", label: "A Shift", ratio: true },
+  { key: "shiftB", label: "B Shift", ratio: true },
+  { key: "shiftC", label: "C Shift", ratio: true },
+  { key: "general", label: "General", ratio: true },
   { key: "leave", label: "Leave" },
   { key: "od", label: "OD" },
   { key: "ot", label: "OT" },
 ];
+// shift bucket -> summary key
+const SHIFT_KEY = { "A Shift": "shiftA", "B Shift": "shiftB", "C Shift": "shiftC", General: "general" };
 
 export default function DayWiseReport() {
   // `?q=` pre-fills the search — used by the Month Wise Report "View daily
@@ -81,29 +84,37 @@ export default function DayWiseReport() {
 
   // Status counts + shift-wise headcount for the day. Shifts are bucketed via
   // shiftBucket so roster variants ("A Shift" / "1-General" / ...) all land right.
-  const { counts, extraShifts } = useMemo(() => {
+  const { counts, shiftStats, extraShifts } = useMemo(() => {
     const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
-    const other = new Map(); // shift labels we don't recognise -> shown as own cards
+    // shift key -> { present, total } headcount for the day
+    const stats = Object.fromEntries(Object.values(SHIFT_KEY).map((k) => [k, { present: 0, total: 0 }]));
+    const other = new Map(); // unrecognised shift labels -> their own cards
+
     rows.forEach((r) => {
       const v = String(r.empAction ?? "").toLowerCase();
+      const isPresent = v.includes("present");
       out.total += 1;
-      if (v.includes("present")) out.present += 1;
+      if (isPresent) out.present += 1;
       if (v.includes("absent")) out.absent += 1;
       if (v.includes("week") && v.includes("off")) out.weekoff += 1;
       if (v.includes("leave")) out.leave += 1;
       if (v === "od" || v.includes(" od")) out.od += 1;
       if (v === "ot" || v.includes("overtime")) out.ot += 1;
-      switch (shiftBucket(r.empShift)) {
-        case "General": out.general += 1; break;
-        case "A Shift": out.shiftA += 1; break;
-        case "B Shift": out.shiftB += 1; break;
-        case "C Shift": out.shiftC += 1; break;
-        case "WEEK OFF": break; // already counted by the Week Off card
-        case "": break; // no shift recorded on the row
-        default: other.set(r.empShift, (other.get(r.empShift) || 0) + 1);
-      }
+
+      const bucket = shiftBucket(r.empShift);
+      if (bucket === "WEEK OFF" || bucket === "") return; // Week Off has its own card
+      const key = SHIFT_KEY[bucket];
+      const target = key ? stats[key] : other.get(r.empShift) || { present: 0, total: 0 };
+      target.total += 1;
+      if (isPresent) target.present += 1;
+      if (!key) other.set(r.empShift, target);
     });
-    return { counts: out, extraShifts: [...other.entries()].sort((a, b) => b[1] - a[1]) };
+
+    return {
+      counts: out,
+      shiftStats: stats,
+      extraShifts: [...other.entries()].sort((a, b) => b[1].total - a[1].total),
+    };
   }, [rows]);
 
   const columns = [
@@ -176,14 +187,18 @@ export default function DayWiseReport() {
       <div className="summary-grid summary-grid--row mb-4">
         {SUMMARY.map((s) => (
           <div className="summary-tile" key={s.key}>
-            <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
+            <div className="summary-tile__value">
+              {s.ratio
+                ? `${shiftStats[s.key].present}/${shiftStats[s.key].total}`
+                : counts[s.key] ?? 0}
+            </div>
             <div className="summary-tile__label">{s.label}</div>
           </div>
         ))}
         {/* Shift labels outside General/A/B/C — surfaced, never dropped */}
-        {extraShifts.map(([label, n]) => (
+        {extraShifts.map(([label, v]) => (
           <div className="summary-tile" key={label}>
-            <div className="summary-tile__value">{n}</div>
+            <div className="summary-tile__value">{`${v.present}/${v.total}`}</div>
             <div className="summary-tile__label">{label}</div>
           </div>
         ))}
