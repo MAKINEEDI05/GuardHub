@@ -55,6 +55,9 @@ const SUMMARY = [
 ];
 // shift bucket -> summary key
 const SHIFT_KEY = { "A Shift": "shiftA", "B Shift": "shiftB", "C Shift": "shiftC", General: "general" };
+// Employees with no roster (or no shift for that weekday) — surfaced so the
+// cards always add up to Total instead of quietly losing people.
+const NOT_ROSTERED = "Not Rostered";
 
 export default function DayWiseReport() {
   // `?q=` pre-fills the search — used by the Month Wise Report "View daily
@@ -122,12 +125,14 @@ export default function DayWiseReport() {
       const roster = rosterMap.get(String(e.empId));
       const bucket = shiftBucket(shiftForDate(roster?.weeklyShifts, date));
       if (bucket === "WEEK OFF") { out.weekoff += 1; return; }
-      if (!bucket) return; // employee has no roster for that weekday
-      const key = SHIFT_KEY[bucket];
-      const target = key ? stats[key] : other.get(bucket) || { present: 0, total: 0 };
+      // No roster (or no shift set for that weekday) gets its own bucket rather
+      // than being dropped — so the cards always reconcile with Total.
+      const label = bucket || NOT_ROSTERED;
+      const key = SHIFT_KEY[label];
+      const target = key ? stats[key] : other.get(label) || { present: 0, total: 0 };
       target.total += 1;
       if (presentIds.has(String(e.empId))) target.present += 1;
-      if (!key) other.set(bucket, target);
+      if (!key) other.set(label, target);
     });
 
     return {

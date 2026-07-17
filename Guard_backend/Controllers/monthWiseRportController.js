@@ -43,6 +43,11 @@ const isWeekOffValue = (v) => {
   return s.includes("week") && s.includes("off");
 };
 
+// Bucket for days an employee has no roster (or no shift set for that weekday).
+// Keeps the shift totals reconciling with employees x days instead of quietly
+// losing those days. Mirrored by the UI, which shows it as its own card.
+const NOT_ROSTERED = "Not Rostered";
+
 // Add every yyyy-mm-dd between [from,to] clamped to [rangeStart,rangeEnd] to acc.
 const addCoveredDates = (from, to, rangeStart, rangeEnd, acc) => {
   if (!from || !to) return;
@@ -384,13 +389,14 @@ const getMonthwiseSummary = async (req, res) => {
     const shiftDaysFor = (code) => {
       const roster = rosterMap.get(code);
       const out = {};
-      if (roster && roster.weeklyShifts) {
-        WEEKDAYS.forEach((d, i) => {
-          const s = String(roster.weeklyShifts[d] || "").trim();
-          if (!s) return;
-          out[s] = (out[s] || 0) + dowCounts[i];
-        });
-      }
+      WEEKDAYS.forEach((d, i) => {
+        if (!dowCounts[i]) return;
+        const s = roster && roster.weeklyShifts ? String(roster.weeklyShifts[d] || "").trim() : "";
+        // No roster / no shift for that weekday still has to land somewhere, or
+        // those days silently disappear from the shift totals.
+        const label = s || NOT_ROSTERED;
+        out[label] = (out[label] || 0) + dowCounts[i];
+      });
       return out;
     };
 
@@ -401,12 +407,12 @@ const getMonthwiseSummary = async (req, res) => {
       const roster = rosterMap.get(code);
       const dates = presentMap.get(code);
       const out = {};
-      if (!dates || !roster || !roster.weeklyShifts) return out;
+      if (!dates) return out;
       for (const key of dates) {
         const dow = new Date(`${key}T00:00:00.000Z`).getUTCDay();
-        const s = String(roster.weeklyShifts[WEEKDAYS[dow]] || "").trim();
-        if (!s) continue;
-        out[s] = (out[s] || 0) + 1;
+        const s = roster && roster.weeklyShifts ? String(roster.weeklyShifts[WEEKDAYS[dow]] || "").trim() : "";
+        const label = s || NOT_ROSTERED; // mirrors shiftDaysFor's bucketing
+        out[label] = (out[label] || 0) + 1;
       }
       return out;
     };
