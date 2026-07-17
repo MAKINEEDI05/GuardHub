@@ -21,6 +21,7 @@ const {
 const {
   getBalances,
   allocateBalances,
+  resetBalances,
 } = require("../Controllers/leaveBalanceController");
 const {
   recordLeave,
@@ -45,6 +46,8 @@ router.delete("/types/:id", deleteType);
 // ---- Leave Balances (yearly allocation + remaining) ----
 router.get("/balances", getBalances);
 router.post("/balances/allocate", allocateBalances);
+// Academic reset: fresh quotas for everyone; Comp Off carries forward.
+router.post("/balances/reset", resetBalances);
 
 // ---- Leave Transactions (record / history / edit / delete) ----
 router.get("/transactions", listTransactions);

@@ -84,6 +84,23 @@ export function useAllocateLeave() {
   });
 }
 
+// Academic reset — rewrites every employee's balances, so refresh every leave
+// cache (balances, management view, reports, dashboard).
+export function useResetLeaveBalances() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (year) => leaveBalanceService.reset(year),
+    onSuccess: (res) => {
+      invalidateLeave(qc);
+      toast.success(
+        `Academic reset done for ${res?.employees ?? 0} employee(s). ` +
+        `Comp Off carried forward: ${res?.compOffCarriedForward ?? 0} day(s).`
+      );
+    },
+    onError: (e) => toast.error(e.friendlyMessage || "Failed to reset leave balances."),
+  });
+}
+
 /* ---- Transactions ---- */
 export function useLeaveTransactions(filters = {}, opts = {}) {
   return useQuery({
