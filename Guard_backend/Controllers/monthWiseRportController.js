@@ -43,11 +43,6 @@ const isWeekOffValue = (v) => {
   return s.includes("week") && s.includes("off");
 };
 
-// Bucket for days an employee has no roster (or no shift set for that weekday).
-// Keeps the shift totals reconciling with employees x days instead of quietly
-// losing those days. Mirrored by the UI, which shows it as its own card.
-const NOT_ROSTERED = "Not Rostered";
-
 // Add every yyyy-mm-dd between [from,to] clamped to [rangeStart,rangeEnd] to acc.
 const addCoveredDates = (from, to, rangeStart, rangeEnd, acc) => {
   if (!from || !to) return;
@@ -320,12 +315,10 @@ const getMonthwiseSummary = async (req, res) => {
           },
         },
       },
-      // Keep the actual days (not just a count) so present can also be split by
-      // the shift the employee was rostered to on each of those days.
-      { $group: { _id: "$_id.code", days: { $addToSet: "$_id.day" } } },
+      { $group: { _id: "$_id.code", presentDays: { $sum: 1 } } },
     ]);
     const presentMap = new Map(
-      presentAgg.map((p) => [String(p._id), new Set(p.days)])
+      presentAgg.map((p) => [String(p._id), p.presentDays])
     );
 
     // ---- Leave / OD / OT: covered-day Set per employee, one find each --------
@@ -382,41 +375,6 @@ const getMonthwiseSummary = async (req, res) => {
       }
       return set;
     };
-    // Days in the range this employee is rostered to each shift, e.g.
-    // { "General": 12, "A Shift": 4, "WEEK OFF": 4 }. Rosters rotate by weekday,
-    // so an employee legitimately contributes days to several shifts. Summed by
-    // the UI over the filtered rows to drive the shift-wise cards.
-    const shiftDaysFor = (code) => {
-      const roster = rosterMap.get(code);
-      const out = {};
-      WEEKDAYS.forEach((d, i) => {
-        if (!dowCounts[i]) return;
-        const s = roster && roster.weeklyShifts ? String(roster.weeklyShifts[d] || "").trim() : "";
-        // No roster / no shift for that weekday still has to land somewhere, or
-        // those days silently disappear from the shift totals.
-        const label = s || NOT_ROSTERED;
-        out[label] = (out[label] || 0) + dowCounts[i];
-      });
-      return out;
-    };
-
-    // Days in the range the employee was PRESENT, split by the shift they were
-    // rostered to on each of those days — the numerator for the shift cards
-    // ("present / rostered", e.g. 1/2).
-    const presentShiftDaysFor = (code) => {
-      const roster = rosterMap.get(code);
-      const dates = presentMap.get(code);
-      const out = {};
-      if (!dates) return out;
-      for (const key of dates) {
-        const dow = new Date(`${key}T00:00:00.000Z`).getUTCDay();
-        const s = roster && roster.weeklyShifts ? String(roster.weeklyShifts[WEEKDAYS[dow]] || "").trim() : "";
-        const label = s || NOT_ROSTERED; // mirrors shiftDaysFor's bucketing
-        out[label] = (out[label] || 0) + 1;
-      }
-      return out;
-    };
-
     // Count covered dates whose weekday is NOT one of the employee's weekly offs.
     const countWorkingCovered = (set, offSet) => {
       if (!set) return 0;
@@ -431,7 +389,7 @@ const getMonthwiseSummary = async (req, res) => {
     let rows = employees.map((e) => {
       const code = String(e.empId);
       const offSet = weekOffWeekdaysFor(code);
-      const presentDays = presentMap.get(code)?.size || 0;
+      const presentDays = presentMap.get(code) || 0;
       const leaveDays = countWorkingCovered(leaveMap.get(e.empId), offSet);
       const odDays = countWorkingCovered(odMap.get(e.empId), offSet);
       const otDays = otMap.get(e.empId)?.size || 0;
@@ -453,8 +411,6 @@ const getMonthwiseSummary = async (req, res) => {
         otDays,
         weekOffDays,
         totalDays,
-        shiftDays: shiftDaysFor(code),
-        presentShiftDays: presentShiftDaysFor(code),
       };
     });
 

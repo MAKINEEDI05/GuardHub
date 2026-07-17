@@ -112,7 +112,6 @@ export default function DayWiseReport() {
     rows.forEach((r) => {
       const v = String(r.empAction ?? "").toLowerCase();
       if (v.includes("present")) { out.present += 1; presentIds.add(String(r.empId)); }
-      if (v.includes("absent")) out.absent += 1;
       if (v.includes("leave")) out.leave += 1;
       if (v === "od" || v.includes(" od")) out.od += 1;
       if (v === "ot" || v.includes("overtime")) out.ot += 1;
@@ -134,6 +133,11 @@ export default function DayWiseReport() {
       if (presentIds.has(String(e.empId))) target.present += 1;
       if (!key) other.set(label, target);
     });
+
+    // 3. Absent is DERIVED, exactly like the Month-Wise report
+    //    (absent = total - present - leave - od - weekOff), so the two reports
+    //    can never disagree. Anyone not accounted for on a working day is absent.
+    out.absent = Math.max(0, out.total - out.present - out.leave - out.od - out.weekoff);
 
     return {
       counts: out,
