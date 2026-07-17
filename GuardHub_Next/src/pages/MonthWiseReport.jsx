@@ -17,7 +17,7 @@ import {
   isFutureYmd,
   FUTURE_DATE_MESSAGE,
 } from "../utils/date";
-import { ROSTER_SHIFTS } from "../utils/constants";
+import { shiftShort } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Month Wise Report — all employees by default, search just filters the table.
@@ -36,6 +36,22 @@ const CSV_COLUMNS = [
   { key: "otDays", label: "OT Days" },
   { key: "weekOffDays", label: "Week Off Days" },
   { key: "totalDays", label: "Total Days" },
+];
+
+// Summary cards above the table. Total = employees; Present/Absent/Leave/OD/OT/
+// Week Off are day totals; A/B/C/General are days rostered to that shift.
+const SUMMARY = [
+  { key: "total", label: "Total" },
+  { key: "present", label: "Present" },
+  { key: "absent", label: "Absent" },
+  { key: "weekoff", label: "Week Off" },
+  { key: "shiftA", label: "A Shift" },
+  { key: "shiftB", label: "B Shift" },
+  { key: "shiftC", label: "C Shift" },
+  { key: "general", label: "General" },
+  { key: "leave", label: "Leave" },
+  { key: "od", label: "OD" },
+  { key: "ot", label: "OT" },
 ];
 
 // Numeric attendance columns rendered as right-aligned, sortable cells.
@@ -83,20 +99,30 @@ export default function MonthWiseReport() {
     );
   }, [rows, term]);
 
-  // Shift-wise totals = days rostered to each shift, summed over the FILTERED
-  // rows (rosters rotate by weekday, so one employee contributes to several).
-  const shiftCounts = useMemo(() => {
-    const map = new Map();
+  // Cards over the FILTERED rows: Total = employees; attendance figures are day
+  // totals; shift figures are days rostered to each shift (rosters rotate by
+  // weekday, so one employee contributes days to several shifts).
+  const counts = useMemo(() => {
+    const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
+    out.total = filtered.length;
     filtered.forEach((r) => {
+      out.present += r.presentDays || 0;
+      out.absent += r.absentDays || 0;
+      out.weekoff += r.weekOffDays || 0;
+      out.leave += r.leaveDays || 0;
+      out.od += r.odDays || 0;
+      out.ot += r.otDays || 0;
       Object.entries(r.shiftDays || {}).forEach(([shift, n]) => {
-        map.set(shift, (map.get(shift) || 0) + n);
+        switch (shiftShort(shift)) {
+          case "GEN": out.general += n; break;
+          case "A": out.shiftA += n; break;
+          case "B": out.shiftB += n; break;
+          case "C": out.shiftC += n; break;
+          default: break;
+        }
       });
     });
-    const order = ROSTER_SHIFTS;
-    return [...map.entries()].sort((a, b) => {
-      const ia = order.indexOf(a[0]); const ib = order.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
-    });
+    return out;
   }, [filtered]);
 
   const exportCsv = () => {
@@ -196,21 +222,16 @@ export default function MonthWiseReport() {
         {dateError && <div className="field__error mt-2">{dateError}</div>}
       </Card>
 
-      {/* Shift-wise cards — days rostered to each shift over the selected range */}
-      {!dateError && shiftCounts.length > 0 && (
-        <>
-          <div className="text-sm muted" style={{ fontWeight: 600, margin: "0 0 8px" }}>
-            Shift Wise (days in range)
-          </div>
-          <div className="summary-grid mb-4">
-            {shiftCounts.map(([shift, n]) => (
-              <div className="summary-tile" key={shift}>
-                <div className="summary-tile__value">{n}</div>
-                <div className="summary-tile__label">{shift}</div>
-              </div>
-            ))}
-          </div>
-        </>
+      {/* Summary cards */}
+      {!dateError && (
+        <div className="summary-grid mb-4">
+          {SUMMARY.map((s) => (
+            <div className="summary-tile" key={s.key}>
+              <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
+              <div className="summary-tile__label">{s.label}</div>
+            </div>
+          ))}
+        </div>
       )}
 
       {dateError ? (

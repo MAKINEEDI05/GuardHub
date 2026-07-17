@@ -13,7 +13,7 @@ import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useAttendanceByDate } from "../hooks/useReports";
 import { useEmployees } from "../hooks/useEmployees";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
-import { ROSTER_SHIFTS } from "../utils/constants";
+import { shiftShort } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date —
@@ -31,15 +31,20 @@ const CSV_COLUMNS = [
   { key: "empDate", label: "Date" },
 ];
 
-// Summary cards shown above the table (counts derived from the day's records).
+// Summary cards shown above the table: attendance status counts plus the
+// shift-wise headcount for the day, in one row.
 const SUMMARY = [
-  { key: "total", label: "Total", match: () => true },
-  { key: "present", label: "Present", match: (v) => v.includes("present") },
-  { key: "absent", label: "Absent", match: (v) => v.includes("absent") },
-  { key: "weekoff", label: "Week Off", match: (v) => v.includes("week") && v.includes("off") },
-  { key: "leave", label: "Leave", match: (v) => v.includes("leave") },
-  { key: "od", label: "OD", match: (v) => v === "od" || v.includes(" od") },
-  { key: "ot", label: "OT", match: (v) => v === "ot" || v.includes("overtime") },
+  { key: "total", label: "Total" },
+  { key: "present", label: "Present" },
+  { key: "absent", label: "Absent" },
+  { key: "weekoff", label: "Week Off" },
+  { key: "shiftA", label: "A Shift" },
+  { key: "shiftB", label: "B Shift" },
+  { key: "shiftC", label: "C Shift" },
+  { key: "general", label: "General" },
+  { key: "leave", label: "Leave" },
+  { key: "od", label: "OD" },
+  { key: "ot", label: "OT" },
 ];
 
 export default function DayWiseReport() {
@@ -74,31 +79,28 @@ export default function DayWiseReport() {
     );
   }, [rows, term]);
 
+  // Status counts + shift-wise headcount for the day. Shifts are bucketed via
+  // shiftShort so roster variants ("A Shift" / "1-General" / ...) all land right.
   const counts = useMemo(() => {
-    const out = {};
-    SUMMARY.forEach((s) => (out[s.key] = 0));
+    const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
     rows.forEach((r) => {
       const v = String(r.empAction ?? "").toLowerCase();
-      SUMMARY.forEach((s) => {
-        if (s.key === "total" || s.match(v)) out[s.key] += 1;
-      });
+      out.total += 1;
+      if (v.includes("present")) out.present += 1;
+      if (v.includes("absent")) out.absent += 1;
+      if (v.includes("week") && v.includes("off")) out.weekoff += 1;
+      if (v.includes("leave")) out.leave += 1;
+      if (v === "od" || v.includes(" od")) out.od += 1;
+      if (v === "ot" || v.includes("overtime")) out.ot += 1;
+      switch (shiftShort(r.empShift)) {
+        case "GEN": out.general += 1; break;
+        case "A": out.shiftA += 1; break;
+        case "B": out.shiftB += 1; break;
+        case "C": out.shiftC += 1; break;
+        default: break;
+      }
     });
     return out;
-  }, [rows]);
-
-  // Shift-wise headcount for the day (grouped from each record's rostered shift),
-  // ordered by the canonical shift list with any off-list value appended.
-  const shiftCounts = useMemo(() => {
-    const map = new Map();
-    rows.forEach((r) => {
-      const s = String(r.empShift || "").trim() || "Not Set";
-      map.set(s, (map.get(s) || 0) + 1);
-    });
-    const order = [...ROSTER_SHIFTS, "Not Set"];
-    return [...map.entries()].sort((a, b) => {
-      const ia = order.indexOf(a[0]); const ib = order.indexOf(b[0]);
-      return (ia === -1 ? 99 : ia) - (ib === -1 ? 99 : ib) || a[0].localeCompare(b[0]);
-    });
   }, [rows]);
 
   const columns = [
@@ -176,21 +178,6 @@ export default function DayWiseReport() {
           </div>
         ))}
       </div>
-
-      {/* Shift-wise headcount for the selected day */}
-      {shiftCounts.length > 0 && (
-        <>
-          <div className="text-sm muted" style={{ fontWeight: 600, margin: "0 0 8px" }}>Shift Wise</div>
-          <div className="summary-grid mb-4">
-            {shiftCounts.map(([shift, n]) => (
-              <div className="summary-tile" key={shift}>
-                <div className="summary-tile__value">{n}</div>
-                <div className="summary-tile__label">{shift}</div>
-              </div>
-            ))}
-          </div>
-        </>
-      )}
 
       {futureDate ? (
         <Card>
