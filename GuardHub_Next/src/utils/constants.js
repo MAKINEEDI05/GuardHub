@@ -116,6 +116,23 @@ export function rosterShiftClass(value) {
   return "shift--neutral";
 }
 
+// Classify a roster shift label into a report bucket, tolerant of the variants
+// real roster data carries ("General", "1-General", "A Shift", "Shift A",
+// "2-B Shift", "C", "WO"). Returns a canonical bucket name, "" when there is no
+// value, or the ORIGINAL string when unrecognised — callers surface unknown
+// labels as their own card rather than silently dropping the days.
+export function shiftBucket(value) {
+  const s = String(value || "").trim();
+  if (!s) return "";
+  if (/week\s*off/i.test(s) || /^wo$/i.test(s)) return "WEEK OFF";
+  if (/gen(eral)?/i.test(s)) return "General";
+  const m =
+    s.match(/(?:^|[^a-z])([abc])(?:\s*shift)?(?:[^a-z]|$)/i) ||
+    s.match(/shift\s*[-_ ]?\s*([abc])(?:[^a-z]|$)/i);
+  if (m) return `${m[1].toUpperCase()} Shift`;
+  return s;
+}
+
 // Short label for a roster shift cell: GEN / A / B / C / OFF.
 export function shiftShort(value) {
   const s = String(value || "");

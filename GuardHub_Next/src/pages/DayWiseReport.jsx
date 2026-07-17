@@ -13,7 +13,7 @@ import EmployeeTableCell from "../components/EmployeeTableCell";
 import { useAttendanceByDate } from "../hooks/useReports";
 import { useEmployees } from "../hooks/useEmployees";
 import { todayYmd, isFutureYmd, FUTURE_DATE_MESSAGE } from "../utils/date";
-import { shiftShort } from "../utils/constants";
+import { shiftBucket } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Day Wise attendance, sourced from /attendance/get-attendace-bydate/:date —
@@ -80,9 +80,10 @@ export default function DayWiseReport() {
   }, [rows, term]);
 
   // Status counts + shift-wise headcount for the day. Shifts are bucketed via
-  // shiftShort so roster variants ("A Shift" / "1-General" / ...) all land right.
-  const counts = useMemo(() => {
+  // shiftBucket so roster variants ("A Shift" / "1-General" / ...) all land right.
+  const { counts, extraShifts } = useMemo(() => {
     const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
+    const other = new Map(); // shift labels we don't recognise -> shown as own cards
     rows.forEach((r) => {
       const v = String(r.empAction ?? "").toLowerCase();
       out.total += 1;
@@ -92,15 +93,17 @@ export default function DayWiseReport() {
       if (v.includes("leave")) out.leave += 1;
       if (v === "od" || v.includes(" od")) out.od += 1;
       if (v === "ot" || v.includes("overtime")) out.ot += 1;
-      switch (shiftShort(r.empShift)) {
-        case "GEN": out.general += 1; break;
-        case "A": out.shiftA += 1; break;
-        case "B": out.shiftB += 1; break;
-        case "C": out.shiftC += 1; break;
-        default: break;
+      switch (shiftBucket(r.empShift)) {
+        case "General": out.general += 1; break;
+        case "A Shift": out.shiftA += 1; break;
+        case "B Shift": out.shiftB += 1; break;
+        case "C Shift": out.shiftC += 1; break;
+        case "WEEK OFF": break; // already counted by the Week Off card
+        case "": break; // no shift recorded on the row
+        default: other.set(r.empShift, (other.get(r.empShift) || 0) + 1);
       }
     });
-    return out;
+    return { counts: out, extraShifts: [...other.entries()].sort((a, b) => b[1] - a[1]) };
   }, [rows]);
 
   const columns = [
@@ -175,6 +178,13 @@ export default function DayWiseReport() {
           <div className="summary-tile" key={s.key}>
             <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
             <div className="summary-tile__label">{s.label}</div>
+          </div>
+        ))}
+        {/* Shift labels outside General/A/B/C — surfaced, never dropped */}
+        {extraShifts.map(([label, n]) => (
+          <div className="summary-tile" key={label}>
+            <div className="summary-tile__value">{n}</div>
+            <div className="summary-tile__label">{label}</div>
           </div>
         ))}
       </div>

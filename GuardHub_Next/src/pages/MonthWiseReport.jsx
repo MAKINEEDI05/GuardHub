@@ -17,7 +17,7 @@ import {
   isFutureYmd,
   FUTURE_DATE_MESSAGE,
 } from "../utils/date";
-import { shiftShort } from "../utils/constants";
+import { shiftBucket } from "../utils/constants";
 import { exportFilteredCsv } from "../utils/exportCsv";
 
 // Month Wise Report — all employees by default, search just filters the table.
@@ -102,8 +102,9 @@ export default function MonthWiseReport() {
   // Cards over the FILTERED rows: Total = employees; attendance figures are day
   // totals; shift figures are days rostered to each shift (rosters rotate by
   // weekday, so one employee contributes days to several shifts).
-  const counts = useMemo(() => {
+  const { counts, extraShifts } = useMemo(() => {
     const out = Object.fromEntries(SUMMARY.map((s) => [s.key, 0]));
+    const other = new Map(); // roster labels we don't recognise -> shown as own cards
     out.total = filtered.length;
     filtered.forEach((r) => {
       out.present += r.presentDays || 0;
@@ -113,16 +114,18 @@ export default function MonthWiseReport() {
       out.od += r.odDays || 0;
       out.ot += r.otDays || 0;
       Object.entries(r.shiftDays || {}).forEach(([shift, n]) => {
-        switch (shiftShort(shift)) {
-          case "GEN": out.general += n; break;
-          case "A": out.shiftA += n; break;
-          case "B": out.shiftB += n; break;
-          case "C": out.shiftC += n; break;
-          default: break;
+        switch (shiftBucket(shift)) {
+          case "General": out.general += n; break;
+          case "A Shift": out.shiftA += n; break;
+          case "B Shift": out.shiftB += n; break;
+          case "C Shift": out.shiftC += n; break;
+          case "WEEK OFF": break; // already counted by the Week Off card
+          case "": break; // no roster value for that weekday
+          default: other.set(shift, (other.get(shift) || 0) + n);
         }
       });
     });
-    return out;
+    return { counts: out, extraShifts: [...other.entries()].sort((a, b) => b[1] - a[1]) };
   }, [filtered]);
 
   const exportCsv = () => {
@@ -229,6 +232,13 @@ export default function MonthWiseReport() {
             <div className="summary-tile" key={s.key}>
               <div className="summary-tile__value">{counts[s.key] ?? 0}</div>
               <div className="summary-tile__label">{s.label}</div>
+            </div>
+          ))}
+          {/* Roster shift labels outside General/A/B/C — surfaced, never dropped */}
+          {extraShifts.map(([label, n]) => (
+            <div className="summary-tile" key={label}>
+              <div className="summary-tile__value">{n}</div>
+              <div className="summary-tile__label">{label}</div>
             </div>
           ))}
         </div>
